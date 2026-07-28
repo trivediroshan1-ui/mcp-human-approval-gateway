@@ -9,11 +9,12 @@
   },
   "scripts": {
     "build": "vite build",
+    "build:demo": "VITE_STATIC_DEMO=true vite build",
     "dev:client": "vite --host 0.0.0.0",
     "dev:server": "node --watch server/index.js",
     "start": "node server/index.js",
     "test": "node --test",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm run build:demo && npm test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.6.0",

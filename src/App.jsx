@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+// ─── Demo mode ────────────────────────────────────────────────────────────────
+// When VITE_STATIC_DEMO=true (GitHub Pages build), all /api calls are handled
+// by the in-browser demo service — no server, no credentials, no real data.
+import { demoApiAdapter } from "./demo/client.js";
+const IS_DEMO = import.meta.env.VITE_STATIC_DEMO === "true";
+
 const REVIEWERS = [
   { id: "owner-aria", role: "resource-owner", label: "Aria · Resource owner" },
   { id: "analyst-dev", role: "security-analyst", label: "Dev · Security analyst" },
@@ -16,6 +22,11 @@ const STATUS_COPY = {
 };
 
 async function api(path, options) {
+  // In demo mode, bypass the network entirely and use the browser service.
+  if (IS_DEMO) {
+    return demoApiAdapter(path, options);
+  }
+
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -49,6 +60,22 @@ function shortId(value) {
   return value ? value.slice(0, 8) : "—";
 }
 
+function DemoBanner() {
+  if (!IS_DEMO) return null;
+  return (
+    <div
+      className="demo-banner"
+      role="note"
+      aria-label="Demo mode notice"
+    >
+      <strong>Browser-only synthetic research simulation</strong>
+      {" — "}
+      no production systems, credentials or company data.
+      Synthetic state is stored only in this browser. Use Reset Lab to remove it.
+    </div>
+  );
+}
+
 function Header({ auditValid, onReset }) {
   return (
     <header className="topbar">
@@ -61,7 +88,7 @@ function Header({ auditValid, onReset }) {
       </a>
       <div className="mode-chip">
         <span className="live-dot" aria-hidden="true" />
-        Synthetic research mode
+        {IS_DEMO ? "Browser demo" : "Synthetic research mode"}
       </div>
       <div className="header-actions">
         <span className={`chain-state ${auditValid ? "valid" : "invalid"}`}>
@@ -545,6 +572,7 @@ function App() {
 
   return (
     <>
+      <DemoBanner />
       <Header auditValid={verification.valid} onReset={reset} />
       <main id="main-content">
         <Hero metrics={metrics} />

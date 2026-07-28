@@ -2,12 +2,17 @@ name: Verify gateway
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - github-pages-demo
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-test:
@@ -27,7 +32,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Build and test
+      - name: Build and run all tests
         run: npm run check
 
       - name: Audit production dependencies
