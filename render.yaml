@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: mcp-human-approval-gateway
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: ./data/gateway.db
