@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Public-safe research prototype for deterministic policy and human approval of MCP tool actions.",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "vite build",
     "build:demo": "VITE_STATIC_DEMO=true vite build",
