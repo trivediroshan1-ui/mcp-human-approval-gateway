@@ -105,6 +105,24 @@ The control design is informed by:
 These references inform the design; they do not constitute certification or
 formal compliance.
 
+## GitHub Pages browser demonstration
+
+The GitHub Pages edition is a browser-only synthetic simulation. It allows
+visitors to explore deterministic policy decisions, human approval,
+time-limited authorization, guarded execution, replay blocking and audit-chain
+verification without connecting to real systems.
+
+Each visitor has independent demonstration state stored only in their browser.
+Use **Reset Lab** to remove that state.
+
+The browser demonstration does not provide enterprise identity proofing,
+shared approval queues, server-side policy enforcement, durable audit storage,
+multi-user coordination or cross-tab transaction locking. The Node.js and
+SQLite implementation remains the reference full-stack research prototype.
+
+No production systems, company information, customer data, credentials or API
+keys are used by the demonstration.
+
 ## Important scope boundary
 
 This is an educational security prototype, not a production authorization
