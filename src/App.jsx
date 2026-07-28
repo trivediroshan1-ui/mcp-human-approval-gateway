@@ -71,7 +71,7 @@ function DemoBanner() {
       <strong>Browser-only synthetic research simulation</strong>
       {" — "}
       no production systems, credentials or company data.
-      All state is stored in browser memory and resets on page close.
+      Synthetic state is stored only in this browser. Use Reset Lab to remove it.
     </div>
   );
 }
