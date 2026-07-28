@@ -4,16 +4,15 @@
   "private": true,
   "type": "module",
   "description": "Public-safe research prototype for deterministic policy and human approval of MCP tool actions.",
-  "engines": {
-    "node": ">=24"
-  },
+  "engines": { "node": ">=24" },
   "scripts": {
     "build": "vite build",
+    "build:demo": "VITE_STATIC_DEMO=true vite build",
     "dev:client": "vite --host 0.0.0.0",
     "dev:server": "node --watch server/index.js",
     "start": "node server/index.js",
     "test": "node --test",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm run build:demo && npm test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.6.0",
