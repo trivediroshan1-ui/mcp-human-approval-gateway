@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
 
   // GitHub Pages serves from /mcp-human-approval-gateway/ when using a project page.
+  // In demo mode we set the base to the repo name; local server build keeps "/".
   base: isStaticDemo ? "/mcp-human-approval-gateway/" : "/",
 
   define: {
