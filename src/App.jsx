@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import PublicGuide from "./PublicGuide.jsx";
 
 // ─── Demo mode ────────────────────────────────────────────────────────────────
 // When VITE_STATIC_DEMO=true (GitHub Pages build), all /api calls are handled
@@ -576,6 +577,7 @@ function App() {
       <Header auditValid={verification.valid} onReset={reset} />
       <main id="main-content">
         <Hero metrics={metrics} />
+        <PublicGuide />
         {notice && (
           <div className={`notice notice-${notice.type}`} role="status">
             {notice.message}
