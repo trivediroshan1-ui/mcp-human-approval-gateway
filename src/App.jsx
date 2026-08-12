@@ -56,6 +56,16 @@ function formatTime(value) {
   }).format(new Date(value));
 }
 
+function formatCountdown(expiresAt, now) {
+  if (!expiresAt) return null;
+  const remainingMs = new Date(expiresAt).getTime() - now;
+  if (remainingMs <= 0) return "Expired";
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function shortId(value) {
   return value ? value.slice(0, 8) : "—";
 }
@@ -240,6 +250,13 @@ function DecisionPanel({
   onDecide,
   onExecute,
 }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   if (!request) {
     return (
       <section className="panel detail-panel empty-detail" aria-live="polite">
@@ -254,6 +271,10 @@ function DecisionPanel({
 
   const canDecide = request.status === "pending_human";
   const canExecute = ["approved", "auto_approved"].includes(request.status);
+  const countdownLabel = canExecute
+    ? formatCountdown(request.authorizationExpiresAt, now)
+    : null;
+  const isExpired = countdownLabel === "Expired";
 
   return (
     <section className="panel detail-panel" aria-labelledby="decision-title">
@@ -389,11 +410,18 @@ function DecisionPanel({
           <div>
             <span className="live-dot" aria-hidden="true" />
             <p>
-              Authorization expires{" "}
-              <strong>{formatTime(request.authorizationExpiresAt)}</strong>
+              {isExpired ? (
+                <>
+                  Authorization <strong style={{ color: "var(--red)" }}>expired</strong>
+                </>
+              ) : (
+                <>
+                  Expires in <strong>{countdownLabel}</strong> · {formatTime(request.authorizationExpiresAt)}
+                </>
+              )}
             </p>
           </div>
-          <button type="button" disabled={busy} onClick={onExecute}>
+          <button type="button" disabled={busy || isExpired} onClick={onExecute}>
             Execute synthetic action
           </button>
         </div>
