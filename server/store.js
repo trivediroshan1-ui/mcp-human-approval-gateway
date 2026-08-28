@@ -201,12 +201,34 @@ export function createStore(databasePath = ":memory:") {
   return {
     db,
     createRequest(request) {
+      // Bind only the columns this statement declares. `request` may carry
+      // extra advisory-only fields (e.g. skipAnalysis) that aren't persisted
+      // columns - node:sqlite's named-parameter binding rejects unknown keys,
+      // so we whitelist explicitly rather than spreading the whole object.
       insertRequest.run({
-        ...request,
+        id: request.id,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+        actorId: request.actorId,
+        actorType: request.actorType,
+        toolId: request.toolId,
+        action: request.action,
+        resource: request.resource,
+        environment: request.environment,
+        dataClassification: request.dataClassification,
+        justification: request.justification,
+        context: request.context,
         requestedScopes: canonicalJson(request.requestedScopes),
         existingScopes: canonicalJson(request.existingScopes),
+        parentRequestId: request.parentRequestId ?? null,
+        riskScore: request.riskScore,
+        riskLevel: request.riskLevel,
+        status: request.status,
+        policyDecision: request.policyDecision,
         policyReasons: canonicalJson(request.policyReasons),
         policyControls: canonicalJson(request.policyControls),
+        approvalRole: request.approvalRole,
+        authorizationExpiresAt: request.authorizationExpiresAt,
         aiAnalysis: canonicalJson(request.aiAnalysis),
       });
       return this.getRequest(request.id);
