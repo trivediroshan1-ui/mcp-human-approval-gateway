@@ -122,3 +122,17 @@ test("static responses include browser hardening headers and support HEAD", asyn
   assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
   assert.equal(body, "");
 });
+
+test("submitting the ungated-handoff scenario over HTTP is gate-rejected", async (t) => {
+  const app = await startFixture();
+  t.after(() => app.close());
+
+  const submissionResponse = await fetch(`${app.baseUrl}/api/requests`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scenarioId: "ungated-handoff" }),
+  });
+  const submission = await submissionResponse.json();
+  assert.equal(submissionResponse.status, 201);
+  assert.equal(submission.request.status, "gate_rejected");
+});
