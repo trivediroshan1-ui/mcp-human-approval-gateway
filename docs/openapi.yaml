@@ -1,0 +1,181 @@
+openapi: 3.1.0
+info:
+  title: MCP Human Approval Gateway
+  version: 0.1.0
+  description: Synthetic research API for deterministic policy and human approval.
+servers:
+  - url: http://localhost:4174
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Gateway health and synthetic-data marker
+  /api/scenarios:
+    get:
+      operationId: listScenarios
+      responses:
+        "200":
+          description: Synthetic scenarios and registered tools
+  /api/requests:
+    get:
+      operationId: listRequests
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 250
+      responses:
+        "200":
+          description: Requests ordered newest first
+    post:
+      operationId: submitRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [scenarioId]
+                  properties:
+                    scenarioId:
+                      type: string
+                - $ref: "#/components/schemas/ToolRequest"
+      responses:
+        "201":
+          description: Policy-evaluated request
+        "400":
+          description: Invalid or unknown scenario
+        "415":
+          description: JSON content type required
+  /api/requests/{requestId}:
+    get:
+      operationId: getRequest
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: Request with decisions
+        "404":
+          description: Request not found
+  /api/requests/{requestId}/decision:
+    post:
+      operationId: recordDecision
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HumanDecision"
+      responses:
+        "200":
+          description: Committed human decision
+        "404":
+          description: Request not found
+        "409":
+          description: Invalid state, insufficient role or version conflict
+  /api/requests/{requestId}/execute:
+    post:
+      operationId: executeSyntheticAction
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Synthetic execution receipt
+        "404":
+          description: Request not found
+        "409":
+          description: Not authorized, expired or replay blocked
+  /api/audit:
+    get:
+      operationId: listAuditEvents
+      parameters:
+        - in: query
+          name: requestId
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+      responses:
+        "200":
+          description: Audit events ordered newest first
+  /api/audit/verify:
+    get:
+      operationId: verifyAuditChain
+      responses:
+        "200":
+          description: Hash-chain verification result
+components:
+  parameters:
+    RequestId:
+      in: path
+      name: requestId
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    ToolRequest:
+      type: object
+      required: [actorId, toolId, action, resource]
+      properties:
+        actorId:
+          type: string
+        actorType:
+          type: string
+          default: ai-agent
+        toolId:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        environment:
+          type: string
+        dataClassification:
+          type: string
+          enum: [public, internal, confidential, restricted]
+        requestedScopes:
+          type: array
+          items:
+            type: string
+        existingScopes:
+          type: array
+          items:
+            type: string
+        justification:
+          type: string
+        context:
+          type: string
+    HumanDecision:
+      type: object
+      required: [reviewerId, reviewerRole, decision, reason]
+      properties:
+        reviewerId:
+          type: string
+        reviewerRole:
+          type: string
+          enum: [resource-owner, security-analyst, security-lead]
+        decision:
+          type: string
+          enum: [approve, deny]
+        reason:
+          type: string
+          minLength: 12
