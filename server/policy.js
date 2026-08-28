@@ -76,6 +76,7 @@ export function normalizeRequest(input = {}) {
     justification: String(input.justification ?? "").trim(),
     context: String(input.context ?? "").trim(),
     parentRequestId: input.parentRequestId ? String(input.parentRequestId) : null,
+    skipAnalysis: Boolean(input.skipAnalysis),
   };
 }
 
