@@ -19,6 +19,7 @@ const STATUS_COPY = {
   denied: "Denied",
   executed: "Executed",
   expired: "Expired",
+  gate_rejected: "Gate rejected",
 };
 
 async function api(path, options) {
@@ -339,6 +340,36 @@ function DecisionPanel({
             <span>Advisory only</span>
           </div>
           <p className="ai-summary">{request.aiAnalysis?.summary}</p>
+          {request.aiAnalysis?.decisionPackage?.complete === false ? (
+            <p className="ai-summary" style={{ color: "var(--red)" }}>
+              No decision package supplied - the agent stated no options, no
+              recommendation and no confidence level before asking for a human decision.
+            </p>
+          ) : (
+            <>
+              {request.aiAnalysis?.optionsConsidered?.length > 0 && (
+                <>
+                  <h3>Options considered</h3>
+                  <ul>
+                    {request.aiAnalysis.optionsConsidered.map((option) => (
+                      <li key={option}>{option}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {request.aiAnalysis?.recommendation && (
+                <div className="decision-package-line">
+                  <span>Recommendation</span>
+                  <strong>{request.aiAnalysis.recommendation}</strong>
+                  {request.aiAnalysis?.confidence && (
+                    <span className={`confidence-chip ${request.aiAnalysis.confidence}`}>
+                      {request.aiAnalysis.confidence} confidence
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
           {request.aiAnalysis?.questions?.length > 0 && (
             <>
               <h3>Questions for the reviewer</h3>
@@ -433,6 +464,17 @@ function DecisionPanel({
           <span>
             Replay protection active · execution {shortId(request.executionId)}
           </span>
+        </div>
+      )}
+
+      {request.status === "gate_rejected" && (
+        <div className="gate-callout">
+          <strong>Decision-package gate rejected this handoff</strong>
+          <p>{request.aiAnalysis?.decisionPackage?.gap}</p>
+          <p>
+            Policy would have required <strong>{request.approvalRole}</strong> review -
+            but the request was bounced back to the agent before a human ever saw it.
+          </p>
         </div>
       )}
     </section>
