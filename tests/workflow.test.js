@@ -150,3 +150,47 @@ test("the audit chain detects stored-event tampering", async (t) => {
   assert.equal(verification.valid, false);
   assert.equal(verification.failedSequence, 1);
 });
+
+// Decision-package gate: reject require_human handoffs the agent didn't
+// bother to think through before asking a human to decide.
+test("a request with an incomplete decision package is gate-rejected before reaching a human", async (t) => {
+  const app = fixture();
+  t.after(() => app.close());
+  const realAnalyzer = (await import("../server/ai-analyzer.js")).analyzeRequest;
+  const gatedService = createGatewayService({
+    store: app.store,
+    analyzer: realAnalyzer,
+    clock: () => new Date("2026-07-28T08:00:00.000Z"),
+  });
+
+  const submitted = await gatedService.submit({ scenarioId: "ungated-handoff" });
+  assert.equal(submitted.ok, true);
+  assert.equal(submitted.request.status, "gate_rejected");
+  assert.equal(submitted.request.aiAnalysis.decisionPackage.complete, false);
+
+  // gate_rejected is not pending_human, so it cannot be decided on.
+  const decideAttempt = gatedService.decide(submitted.request.id, {
+    reviewerId: "reviewer-lead",
+    reviewerRole: "security-lead",
+    decision: "approve",
+    reason: "Attempting to approve a gate-rejected request.",
+  });
+  assert.equal(decideAttempt.ok, false);
+  assert.equal(decideAttempt.code, "invalid_state");
+});
+
+test("a complete decision package does not trigger the gate for a require_human scenario", async (t) => {
+  const app = fixture();
+  t.after(() => app.close());
+  const realAnalyzer = (await import("../server/ai-analyzer.js")).analyzeRequest;
+  const gatedService = createGatewayService({
+    store: app.store,
+    analyzer: realAnalyzer,
+    clock: () => new Date("2026-07-28T08:00:00.000Z"),
+  });
+
+  const submitted = await gatedService.submit({ scenarioId: "iam-privilege-change" });
+  assert.equal(submitted.request.status, "pending_human");
+  assert.equal(submitted.request.aiAnalysis.decisionPackage.complete, true);
+  assert.ok(submitted.request.aiAnalysis.recommendation);
+});
