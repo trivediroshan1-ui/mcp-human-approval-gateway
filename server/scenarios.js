@@ -246,6 +246,27 @@ export const SCENARIOS = Object.freeze([
       context: "No registered contract or schema exists for this tool.",
     },
   },
+  {
+    id: "ungated-handoff",
+    title: "AI hands off without doing its own analysis",
+    description:
+      "An agent asks for a production privilege grant but skips stating its options, recommendation, or confidence before asking a human to decide.",
+    expected: "Decision-package gate rejects it before a human sees it",
+    request: {
+      actorId: "agent-handoff-09",
+      actorType: "ai-agent",
+      toolId: "iam.roles.update",
+      action: "grant",
+      resource: "identity://synthetic/service-account",
+      environment: "production",
+      dataClassification: "restricted",
+      requestedScopes: ["iam:roles:write"],
+      existingScopes: [],
+      justification: "Grant elevated access to unblock the incident.",
+      context: "The agent submits the raw request without proposing options or a recommendation.",
+      skipAnalysis: true,
+    },
+  },
 ]);
 
 export function scenarioById(id) {
