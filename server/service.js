@@ -34,6 +34,13 @@ export function createGatewayService({
       const authorizationExpiresAt =
         policy.decision === "allow" ? plusMinutes(now, policy.ttlMinutes) : null;
       const aiAnalysis = await analyzer(policy.input, policy);
+
+      // Decision-package gate: if policy requires a human but the agent's own
+      // analysis is incomplete (no options considered, no recommendation, no
+      // confidence), reject the handoff before a human ever sees it.
+      const gateRejected =
+        policy.decision === "require_human" && aiAnalysis.decisionPackage?.complete === false;
+
       const requestInput = {
         id: randomUUID(),
         createdAt: now,
@@ -41,7 +48,7 @@ export function createGatewayService({
         ...policy.input,
         riskScore: policy.score,
         riskLevel: policy.level,
-        status: policy.status,
+        status: gateRejected ? "gate_rejected" : policy.status,
         policyDecision: policy.decision,
         policyReasons: policy.reasons,
         policyControls: policy.controls,
@@ -81,6 +88,19 @@ export function createGatewayService({
             advisoryOnly: true,
           },
         },
+        ...(gateRejected
+          ? [
+              {
+                eventType: "decision_package.rejected",
+                actor: "decision-package-gate",
+                createdAt: now,
+                payload: {
+                  gap: aiAnalysis.decisionPackage.gap,
+                  wouldHaveRequired: requestInput.approvalRole,
+                },
+              },
+            ]
+          : []),
       ]);
       const request = committed.request;
       return { ok: true, request: publicRequest(store.getRequest(request.id), store) };
