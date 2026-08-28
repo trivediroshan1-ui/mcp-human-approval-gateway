@@ -1,4 +1,4 @@
-// Browser-only deterministic AI analyzer â no external API calls, no credentials.
+// Browser-only deterministic AI analyzer - no external API calls, no credentials.
 // Advisory output only. Mirrors the offline-deterministic path of server/ai-analyzer.js.
 
 function optionsConsideredFor(policy) {
@@ -33,7 +33,7 @@ function confidenceFor(policy) {
 // The decision package is the fix for the "processing tax": before a request
 // reaches a human, the agent must show its own options, recommendation and
 // confidence. `skipAnalysis` simulates an agent that handed off without doing
-// that work â the gate in service.js rejects it before a human ever sees it.
+// that work - the gate in service.js rejects it before a human ever sees it.
 function decisionPackageFor(request, policy) {
   if (request.skipAnalysis) {
     return {
