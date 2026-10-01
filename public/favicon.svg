@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HumanGate">
+  <rect width="64" height="64" rx="14" fill="#050a12"/>
+  <path d="M32 9 49 16v14c0 11-7 19-17 25C22 49 15 41 15 30V16z" fill="none" stroke="#56e6f4" stroke-width="4" stroke-linejoin="round"/>
+  <path d="m23 32 6 6 12-13" fill="none" stroke="#62e6a7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
