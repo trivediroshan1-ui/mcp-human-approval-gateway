@@ -4,6 +4,11 @@ A public-safe research prototype for controlling AI-agent tool actions with
 deterministic policy, risk-based human approval, time-bound authorization and a
 tamper-evident audit chain.
 
+It speaks the Model Context Protocol (revision 2026-07-28, with 2025-11-25 for
+older clients) over Streamable HTTP and stdio, so a real MCP client can call its
+tools and hit the same policy and approval gate. See [MCP server](docs/MCP.md).
+The MCP server runs in the Node server only. The browser demo does not speak MCP.
+
 The project demonstrates a strict separation of responsibility:
 
 - **AI explains and recommends.** Its analysis is advisory and cannot change a
@@ -75,9 +80,30 @@ The Vite client runs on `http://localhost:5174` and proxies API calls to port
 npm run check
 ```
 
-The suite covers policy outcomes, reviewer authorization, request-hash binding,
+The suite (167 tests under Node 22) covers policy outcomes, reviewer authorization, request-hash binding,
 atomic decision commits, expiry, single-use execution, audit tamper detection,
-HTTP hardening, server and browser-copy parity and the animated paths.
+HTTP hardening, server and browser-copy parity, the animated paths, and the MCP
+server (raw JSON-RPC over HTTP and a stdio child process).
+
+## MCP server
+
+```bash
+npm start            # web UI, REST API and POST /mcp on 127.0.0.1:4174
+npm run mcp:stdio    # the same server over stdin and stdout
+```
+
+An MCP client sees the seven registered tools and `check_approval_status`. A
+low-risk call runs at once. A risky one returns `pending_approval` with an id,
+a person approves it in the web UI, and the agent calls again with the same
+arguments plus `approvalId` so the guard can consume the single-use approval.
+Denied calls return `isError: true`, and unknown tools return a JSON-RPC
+`-32602` error. Every call, including refusals, lands in the audit chain with
+source `mcp`.
+
+It is unauthenticated demo mode: the caller is a configured agent id plus a
+self-declared `clientInfo`. A real deployment needs the MCP authorization flow
+(OAuth) in front. The connection snippets, a recorded session and the list of
+what is not implemented are in [docs/MCP.md](docs/MCP.md).
 
 ## Optional AI analyst
 
@@ -109,6 +135,7 @@ the latest review is in the [changelog](docs/CHANGELOG.md).
 
 ## Design documents
 
+- [MCP server](docs/MCP.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Workflows](docs/WORKFLOWS.md)
 - [Threat model](docs/THREAT_MODEL.md)

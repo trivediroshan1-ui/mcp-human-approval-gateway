@@ -1,5 +1,17 @@
 # Changelog
 
+## MCP server and site integration
+
+- Added a Model Context Protocol server (revision 2026-07-28, plus 2025-11-25)
+  over Streamable HTTP (`POST /mcp`) and stdio (`npm run mcp:stdio`). It goes
+  through the same policy, approval, single-use execution and audit path as the
+  REST API. See [MCP server](MCP.md).
+- The server now binds to `127.0.0.1` unless `HOST` says otherwise. The Docker
+  image sets `HOST=0.0.0.0`.
+- The UI links back to the site, lists what the demo does not prove, has a five
+  step walkthrough, can download the audit chain as JSON, and labels MCP events.
+- Added page metadata, a favicon and a social image.
+
 ## Review of October 2026
 
 Found by reading the code and probing it, each with a regression test.

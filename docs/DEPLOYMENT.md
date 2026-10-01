@@ -70,10 +70,16 @@ docker run --rm \
 | Variable | Required | Purpose |
 |---|---:|---|
 | `PORT` | No | HTTP port; defaults to `4174` |
+| `HOST` | No | Bind address; defaults to `127.0.0.1`. The Docker image sets `0.0.0.0` |
+| `MCP_HTTP` | No | `POST /mcp` switch; on by default only when bound to loopback. See [MCP server](MCP.md) |
+| `MCP_AGENT_ID`, `MCP_ALLOWED_HOSTS`, `MCP_ALLOWED_ORIGINS` | No | MCP identity label and proxy allowlists. See [MCP server](MCP.md) |
 | `DATABASE_PATH` | No | SQLite path; defaults to `./data/gateway.db` |
 | `AI_BASE_URL` | No | OpenAI-compatible API base URL |
 | `AI_API_KEY` | No | Optional external analyst credential |
 | `AI_MODEL` | No | Optional external analyst model |
+
+The MCP endpoint is unauthenticated demo mode. Leave `MCP_HTTP` off on a public
+host unless something in front of it authenticates callers.
 
 Do not configure an external model for the public demonstration unless its data
 handling has been reviewed. The offline deterministic analyst is the safest

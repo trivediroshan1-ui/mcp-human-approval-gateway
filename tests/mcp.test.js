@@ -225,6 +225,7 @@ test("pending, approve, execute, then replay is refused", async (t) => {
   const scenario = SCENARIOS.find((s) => s.id === "production-deployment");
   const args = scenarioArguments(scenario);
 
+  await app.call("server/discover", {}, { record: true });
   const first = await app.tool("deploy.production", args, { record: true });
   const pending = structured(first);
   assert.equal(pending.outcome, "pending_approval");
@@ -240,6 +241,12 @@ test("pending, approve, execute, then replay is refused", async (t) => {
 
   const decision = await app.review(approvalId, { reviewerId: approverFor["security-lead"], reviewerRole: "security-lead" });
   assert.equal(decision.status, 200);
+  app.transcript.push({
+    human: `POST /api/requests/${approvalId}/decision  (the reviewer UI does this)`,
+    request: { reviewerId: "lead-morgan", reviewerRole: "security-lead", decision: "approve", reason: "Scope and duration are the minimum needed for this test." },
+    status: decision.status,
+    response: { ok: decision.json.ok, status: decision.json.request.status, authorizationExpiresAt: decision.json.request.authorizationExpiresAt },
+  });
 
   const approved = await app.tool("check_approval_status", { approvalId }, { record: true });
   assert.equal(structured(approved).status, "approved");
