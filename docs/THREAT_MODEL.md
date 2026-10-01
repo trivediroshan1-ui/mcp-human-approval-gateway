@@ -24,22 +24,23 @@ execution guard are trusted components for this prototype.
 
 | Threat | Example | Implemented control | Residual risk |
 |---|---|---|---|
-| Spoofing | Agent or reviewer claims another identity | Explicit actor and reviewer fields; role check | Prototype has no enterprise authentication or identity proofing |
-| Tampering | Request or audit event is modified | Transactional state changes, optimistic versioning, SHA-256 audit chain | Database administrator can rewrite the database and recompute hashes |
+| Spoofing | Agent or reviewer claims another identity | Explicit actor and reviewer fields, role check, requester cannot approve itself, execution can require the requester's identity | Identities and roles are caller-supplied strings. There is no authentication |
+| Tampering | Request or audit event is modified, or an approved request is changed before it runs | Transactional state changes, optimistic versioning, approval bound to a request hash that the guard recomputes, SHA-256 audit chain with optional HMAC | Without a key, a database writer can rebuild the chain. Removed tail events need an external anchor. The browser demo has no key |
 | Repudiation | Reviewer denies approving an action | Decision identity, role, rationale and timestamp are recorded | No digital signatures or non-repudiation service |
 | Information disclosure | AI receives a secret or excessive context | Metadata-only secret tool, sanitized external-AI prompt, restrictive schema | A real connector could still return excessive data unless separately enforced |
-| Denial of service | Approval queue or API is flooded | Request-size limit and simple write-rate limit | In-memory limiter is single-node and not identity-aware |
+| Denial of service | Approval queue or API is flooded | 64 KB body limit, field length limits, write-rate limit with pruned buckets, review window | Limiter is in memory, single-node and keyed by address. Reset is unauthenticated unless `ALLOW_RESET=false` |
+| Cross-site request | A web page posts to a locally running gateway | Exact `application/json` media type (forces a preflight that is never granted) and an Origin check on writes | None for browsers. Non-browser clients are not affected by either |
 | Elevation of privilege | Agent adds wildcard or production scope | Registered tool contract, scope-creep denial, role-qualified approval | Registry governance and reviewer-role assignment are not implemented |
 
 ## Agentic and MCP risk alignment
 
 | Risk pattern | Design response |
 |---|---|
-| Goal or context hijacking | Retrieved context has no authority; explicit bypass phrases are denied |
-| Tool misuse | Tool, action and scope allowlists are checked before workflow creation |
+| Goal or context hijacking | Retrieved context has no authority; a folded phrase scan denies obvious bypass attempts in context, justification and arguments. The scan is a heuristic and misses paraphrase |
+| Tool misuse | Tool, action, resource-type and scope allowlists are checked before workflow creation. Tool sensitivity is a floor the requester cannot lower |
 | Identity and privilege abuse | Privilege changes are critical and require a security lead |
 | Privilege escalation through scope creep | Out-of-contract scopes fail closed and require a new request |
-| Context injection and over-sharing | External AI receives sanitized metadata; secret values have no schema field |
+| Context injection and over-sharing | External AI receives a fixed list of fields without context, arguments or resource path, with credential-shaped text redacted from the justification. Secret values have no schema field. Redaction is best effort |
 | Excessive autonomy | Human approval is mandatory for medium and higher risk or impact flags |
 | Unsafe recovery or retry | Execution authorizations are single-use and replay is blocked |
 
@@ -70,6 +71,26 @@ authorization has been consumed.
 
 Expected result: hash-chain verification returns `valid: false` and the first
 failing sequence.
+
+### Audit events are removed from the end of the log
+
+Expected result with no anchor: the chain still verifies, because nothing after
+the cut refers back. With a saved anchor: `valid: false`, reason
+`anchor_mismatch`.
+
+### Attacker with database write access rebuilds the chain
+
+Expected result without `AUDIT_HMAC_KEY`: it verifies. That is a limit, not a
+bug. With the key: `signature_invalid`.
+
+### Approved request is edited in the database
+
+Expected result: the guard recomputes the request hash, sees the difference and
+revokes the authorization (`integrity_failed`).
+
+### Agent claims a public classification for a private tool
+
+Expected result: ignored. The registry sensitivity is the floor.
 
 ## Out of scope
 

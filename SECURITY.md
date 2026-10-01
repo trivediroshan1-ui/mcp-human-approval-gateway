@@ -16,7 +16,10 @@ stores, cloud control planes, source repositories or IAM administration APIs.
 - The executor is simulated.
 - The rate limiter is in memory and single-node.
 - SQLite uses Node's experimental built-in API.
-- The audit chain detects local modification but is not immutable or signed.
+- The audit chain detects local modification but is not immutable. It is signed
+  only when `AUDIT_HMAC_KEY` is set, and removed tail events are detected only
+  against an externally saved anchor. The browser demo has no key.
+- The analyst is a rule-based simulation unless a model is configured.
 - Injection-pattern matching is illustrative, not a complete content-security
   control.
 - External AI configuration uses a generic compatible endpoint and has not been
@@ -26,8 +29,9 @@ stores, cloud control planes, source repositories or IAM administration APIs.
 
 1. Authenticate workloads and humans with verifiable, audience-bound identities.
 2. Source reviewer roles from a governed authorization system, not request data.
-3. Bind approvals cryptographically to the exact normalized request, policy
-   version, tool schema and expiry.
+3. Bind approvals cryptographically (signed, not only hashed) to the exact
+   normalized request, policy version, tool schema and expiry. The prototype binds
+   them to an unsigned SHA-256 of the request and policy version.
 4. Use a durable transactional store and distributed concurrency control.
 5. Put the enforcement point immediately before the real tool invocation.
 6. Validate connector inputs and outputs against versioned schemas.
