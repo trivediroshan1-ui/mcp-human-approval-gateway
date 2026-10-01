@@ -4,6 +4,7 @@
 import { SCENARIOS, TOOL_REGISTRY } from "./scenarios.js";
 import { createStore } from "./store.js";
 import { createGatewayService } from "./service.js";
+import { createFakeDownstream } from "./downstream.js";
 
 const CLOCK_KEY = "mcp_gateway_demo_clock_v1";
 
@@ -31,7 +32,8 @@ let clockOffsetMs = readOffset();
 const labNow = () => new Date(Date.now() + clockOffsetMs);
 
 const store = createStore();
-const service = createGatewayService({ store, clock: labNow });
+const downstream = createFakeDownstream();
+const service = createGatewayService({ store, clock: labNow, downstream });
 
 // One shared promise, so parallel first calls wait for the same start-up reset.
 let initialization = null;
@@ -72,6 +74,7 @@ export async function demoApiAdapter(path, options = {}) {
     return { scenarios: SCENARIOS, tools: Object.values(TOOL_REGISTRY), syntheticDataOnly: true };
   }
   if (route === "/api/requests" && method === "GET") {
+    await service.sweep();
     return { requests: service.list(100) };
   }
   if (route === "/api/requests" && method === "POST") {
@@ -86,9 +89,24 @@ export async function demoApiAdapter(path, options = {}) {
   const executeMatch = route.match(/^\/api\/requests\/([^/]+)\/execute$/);
   if (executeMatch && method === "POST") {
     return unwrap(
-      service.execute(executeMatch[1], { requestHash: body.requestHash, actorId: body.actorId }),
+      service.execute(executeMatch[1], {
+        requestHash: body.requestHash,
+        actorId: body.actorId,
+        idempotencyKey: body.idempotencyKey,
+        executionId: body.executionId,
+      }),
       "Execution failed.",
     );
+  }
+
+  const executionMatch = route.match(/^\/api\/executions\/([^/]+)$/);
+  if (executionMatch && method === "GET") {
+    await service.sweep();
+    return unwrap(service.getExecution(executionMatch[1]), "Execution not found.");
+  }
+  const reconcileMatch = route.match(/^\/api\/executions\/([^/]+)\/reconcile$/);
+  if (reconcileMatch && method === "POST") {
+    return unwrap(service.reconcile(reconcileMatch[1], body), "Reconcile failed.");
   }
 
   if (route === "/api/audit" && method === "GET") {
@@ -121,6 +139,15 @@ export async function demoApiAdapter(path, options = {}) {
     clockOffsetMs += minutes * 60_000;
     writeOffset(clockOffsetMs);
     return { clockOffsetMs, now: labNow().toISOString() };
+  }
+  if (route === "/api/lab/fault" && method === "POST") {
+    const fault = body.fault === "none" ? null : body.fault;
+    try {
+      downstream.injectFault(fault);
+    } catch {
+      throw fail("Unknown fault.", { code: "invalid_fault" });
+    }
+    return { ok: true, fault: body.fault };
   }
   if (route === "/api/lab/tamper" && method === "POST") {
     // Edit a stored audit event in place and leave every hash alone. Verification

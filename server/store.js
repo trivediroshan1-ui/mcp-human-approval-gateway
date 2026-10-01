@@ -68,6 +68,7 @@ function mapRequest(row) {
     requestHash: row.request_hash,
     executionId: row.execution_id,
     executedAt: row.executed_at,
+    execution: parseJson(row.execution, null),
     version: row.version,
   };
 }
@@ -177,6 +178,7 @@ export function createStore(databasePath = ":memory:", { auditKey = null } = {})
   // Databases created before these columns existed are upgraded in place.
   ensureColumn(db, "requests", "arguments", "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, "requests", "request_hash", "TEXT");
+  ensureColumn(db, "requests", "execution", "TEXT");
   ensureColumn(db, "decisions", "request_hash", "TEXT");
   ensureColumn(db, "audit_events", "signature", "TEXT");
   db.exec(
@@ -300,6 +302,10 @@ export function createStore(databasePath = ":memory:", { auditKey = null } = {})
     getRequest(id) {
       return mapRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
     },
+    findByExecutionId(executionId) {
+      if (typeof executionId !== "string" || !executionId) return null;
+      return mapRequest(db.prepare("SELECT * FROM requests WHERE execution_id = ?").get(executionId));
+    },
     listRequests(limit = 100) {
       const safeLimit = Math.max(1, Math.min(250, Number(limit) || 100));
       return db
@@ -316,13 +322,14 @@ export function createStore(databasePath = ":memory:", { auditKey = null } = {})
         authorizationExpiresAt: "authorization_expires_at",
         executionId: "execution_id",
         executedAt: "executed_at",
+        execution: "execution",
       };
       const assignments = [];
       const values = [];
       for (const [key, column] of Object.entries(allowed)) {
         if (Object.hasOwn(changes, key)) {
           assignments.push(`${column} = ?`);
-          values.push(changes[key]);
+          values.push(key === "execution" ? canonicalJson(changes[key]) : changes[key]);
         }
       }
       if (assignments.length === 0) return { ok: true, request: current };

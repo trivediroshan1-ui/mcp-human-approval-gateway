@@ -244,7 +244,7 @@ for (const makeHarness of [serverHarness, demoHarness]) {
     const results = await Promise.all(Array.from({ length: 8 }, () => h.service.execute(request.id)));
     assert.equal(results.filter((r) => r.ok).length, 1);
     for (const r of results.filter((x) => !x.ok)) assert.equal(r.code, "replay_blocked");
-    assert.equal(h.service.audit(request.id, 100).filter((e) => e.eventType === "action.executed").length, 1);
+    assert.equal(h.service.audit(request.id, 100).filter((e) => e.eventType === "action.confirmed").length, 1);
     assert.equal((await h.service.verifyAudit()).valid, true);
   });
 

@@ -35,6 +35,13 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function statusFor(result) {
+  if (result.ok) return 200;
+  if (result.code === "not_found") return 404;
+  if (String(result.code).startsWith("invalid_")) return 400;
+  return 409;
+}
+
 function httpError(status, message) {
   const error = new Error(message);
   error.status = status;
@@ -207,6 +214,7 @@ export function createHttpHandler({
         return;
       }
       if (method === "GET" && url.pathname === "/api/requests") {
+        service.sweep?.();
         sendJson(response, 200, {
           requests: service.list(url.searchParams.get("limit")),
         });
@@ -238,15 +246,39 @@ export function createHttpHandler({
       }
       const executionMatch = routeMatch(
         url.pathname,
-        /^\/api\/requests\/([^/]+)\/execute$/,
+        /^\/api\/requests\/([^/]+)\/(execute|reserve)$/,
       );
       if (method === "POST" && executionMatch) {
         const body = await readJson(request);
-        const result = service.execute(executionMatch[0], {
+        const options = {
           requestHash: body.requestHash,
           actorId: body.actorId,
-        });
-        sendJson(response, result.ok ? 200 : result.code === "not_found" ? 404 : 409, result);
+          idempotencyKey: body.idempotencyKey,
+          executionId: body.executionId,
+        };
+        const result =
+          executionMatch[1] === "reserve"
+            ? service.reserve(executionMatch[0], options)
+            : service.execute(executionMatch[0], options);
+        sendJson(response, statusFor(result), result);
+        return;
+      }
+      const executionRead = routeMatch(url.pathname, /^\/api\/executions\/([^/]+)$/);
+      if (method === "GET" && executionRead) {
+        const result = service.getExecution(executionRead[0]);
+        sendJson(response, statusFor(result), result);
+        return;
+      }
+      const executionAction = routeMatch(url.pathname, /^\/api\/executions\/([^/]+)\/(confirm|reconcile)$/);
+      if (method === "POST" && executionAction) {
+        const body = await readJson(request);
+        // Demo mode: the confirm call is trusted once it shows the dispatch key,
+        // and reconcile trusts the reviewer fields as the REST decision route does.
+        const result =
+          executionAction[1] === "confirm"
+            ? service.confirm(executionAction[0], { ...body, actor: "http-dispatcher" })
+            : service.reconcile(executionAction[0], body);
+        sendJson(response, statusFor(result), result);
         return;
       }
       if (method === "GET" && url.pathname === "/api/audit") {

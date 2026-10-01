@@ -66,7 +66,7 @@ test("2026-07-28: server/discover and tools/list work with no handshake", async 
   const list = await app.call("tools/list");
   assert.equal(list.status, 200);
   assert.equal(list.json.result.resultType, "complete");
-  assert.equal(list.json.result.tools.length, Object.keys(TOOL_REGISTRY).length + 1);
+  assert.equal(list.json.result.tools.length, Object.keys(TOOL_REGISTRY).length + 2);
 });
 
 test("2025-11-25: initialize, initialized notification, ping and tools/list", async (t) => {
@@ -124,8 +124,8 @@ test("tools/list returns valid, stable, honestly annotated tool definitions", as
 
   const names = first.map((tool) => tool.name);
   assert.equal(new Set(names).size, names.length);
-  assert.deepEqual(names.slice(0, -1), Object.keys(TOOL_REGISTRY));
-  assert.equal(names.at(-1), "check_approval_status");
+  assert.deepEqual(names.slice(0, -2), Object.keys(TOOL_REGISTRY));
+  assert.deepEqual(names.slice(-2), ["check_approval_status", "get_execution_result"]);
 
   for (const tool of first) {
     assert.match(tool.name, /^[A-Za-z0-9_.-]{1,128}$/);
@@ -599,4 +599,42 @@ test("an internal failure does not leak details", async (t) => {
   app.service.submit = original;
   assert.equal(response.json.error.code, -32603);
   assert.ok(!JSON.stringify(response.json).includes("secret"));
+});
+
+// ------------------------------------------------------------ lost response
+
+test("lost response: the same idempotency key returns the stored result, a new key is refused", async (t) => {
+  const app = await withFixture(t);
+  const args = {
+    ...scenarioArguments(SCENARIOS.find((s) => s.id === "public-research")),
+    idempotencyKey: "agent-run-0001",
+  };
+  const toolId = SCENARIOS.find((s) => s.id === "public-research").request.toolId;
+  const first = await app.tool(toolId, args);
+  assert.equal(first.json.result.isError, false);
+  assert.equal(first.json.result._meta?.replayed, undefined);
+  const executionId = structured(first).executionId;
+  assert.ok(executionId);
+
+  // The agent never saw that answer. It asks again with the same key.
+  const retry = await app.tool(toolId, args);
+  assert.equal(retry.json.result.isError, false);
+  assert.equal(retry.json.result._meta.replayed, true);
+  assert.equal(structured(retry).executionId, executionId);
+  assert.equal(structured(retry).resultDigest, structured(first).resultDigest);
+  assert.match(retry.json.result.content[0].text, /NOTHING RAN AGAIN/);
+
+  const approvalId = structured(first).approvalId;
+  const fresh = await app.tool(toolId, { ...args, approvalId, idempotencyKey: "agent-run-0002" });
+  assert.equal(fresh.json.result.isError, true);
+  assert.equal(app.downstream.stats().effects, 1);
+
+  const read = await app.tool("get_execution_result", { executionId });
+  assert.equal(read.json.result.isError, false);
+  assert.equal(structured(read).state ?? structured(read).status ?? structured(read).execution?.state, "executed", JSON.stringify(structured(read)));
+  const unknown = await app.tool("get_execution_result", { executionId: "exec_missing" });
+  assert.equal(unknown.json.result.isError, true);
+
+  const names = (await app.call("tools/list")).json.result.tools.map((x) => x.name);
+  assert.ok(names.includes("get_execution_result"));
 });

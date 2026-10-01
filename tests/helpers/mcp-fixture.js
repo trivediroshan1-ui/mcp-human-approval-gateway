@@ -6,6 +6,7 @@ import { createHttpHandler } from "../../server/http.js";
 import { createGatewayService } from "../../server/service.js";
 import { SCENARIOS, TOOL_REGISTRY } from "../../server/scenarios.js";
 import { createStore } from "../../server/store.js";
+import { createFakeDownstream } from "../../server/downstream.js";
 import { createMcpServer, MODERN_VERSION, LEGACY_VERSION } from "../../server/mcp.js";
 import { createMcpHttpHandler } from "../../server/mcp-http.js";
 
@@ -46,7 +47,8 @@ export async function startMcpFixture({
   maxRequestsPerMinute = 100000,
 } = {}) {
   const store = createStore(":memory:", { auditKey: AUDIT_KEY });
-  const service = createGatewayService({ store, ...(clock ? { clock } : {}) });
+  const downstream = createFakeDownstream();
+  const service = createGatewayService({ store, downstream, ...(clock ? { clock } : {}) });
   service.reset("test-startup");
   const mcp = createMcpServer({
     service,
@@ -112,6 +114,7 @@ export async function startMcpFixture({
     baseUrl,
     store,
     service,
+    downstream,
     mcp,
     transcript,
     post,
