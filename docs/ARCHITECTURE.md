@@ -34,6 +34,42 @@ response is never an authorization token. The same flow, with the numbered steps
 and one guardrail each, is animated in the Architecture section of the app and
 written out in [Workflows](WORKFLOWS.md).
 
+## MCP layer
+
+`server/mcp.js` is the protocol core. It takes one parsed JSON-RPC message and
+returns a reply. `server/mcp-http.js` (POST `/mcp`) and `server/mcp-stdio.js`
+(`npm run mcp:stdio`) are thin transports around it. The core calls the same
+`service.submit`, `service.execute` and audit store as the REST API, so MCP
+adds no second decision path. Revision 2026-07-28 is implemented, with
+2025-11-25 on the same endpoint. Details and the list of what is missing are in
+[MCP server](MCP.md).
+
+```mermaid
+sequenceDiagram
+    participant C as MCP client (agent)
+    participant M as MCP layer
+    participant G as Gateway service
+    participant H as Human reviewer (web UI)
+    C->>M: tools/call deploy.production
+    M->>G: submit (actor = configured agent id)
+    G-->>M: pending_human
+    M-->>C: pending_approval + approvalId (NOT EXECUTED)
+    H->>G: approve (role checked, not the requester)
+    C->>M: tools/call check_approval_status
+    M-->>C: approved, expires soon
+    C->>M: tools/call deploy.production + approvalId
+    M->>G: execute (request hash, actor, expiry, single use)
+    G-->>M: executed (synthetic)
+    M-->>C: result, isError false
+    Note over M,G: every step above is also written to the audit chain, MCP steps with source "mcp"
+```
+
+Unknown tool names are refused with JSON-RPC `-32602`. The attempt is still
+submitted to the gateway so policy records a deny and the audit chain shows it.
+The client never supplies its own `actorId`: the requester is the configured
+agent id, so it cannot approve or replay as someone else. In demo mode that
+identity is unauthenticated, and the audit events say so.
+
 ## Components
 
 ### Tool registry
