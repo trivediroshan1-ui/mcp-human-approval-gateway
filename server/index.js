@@ -15,7 +15,10 @@ const databasePath = resolve(
 const clientDir = resolve(projectRoot, "dist/client");
 const port = Number(process.env.PORT ?? 4174);
 
-const store = createStore(databasePath);
+// AUDIT_HMAC_KEY (optional): signs every audit event so a database writer
+// without the key cannot rebuild the chain. ALLOW_RESET=false removes the
+// unauthenticated reset route.
+const store = createStore(databasePath, { auditKey: process.env.AUDIT_HMAC_KEY || null });
 const service = createGatewayService({ store });
 if (store.listAudit(null, 1).length === 0) service.reset("gateway-startup");
 
@@ -25,6 +28,7 @@ const server = createServer(
     scenarios: SCENARIOS,
     toolRegistry: TOOL_REGISTRY,
     clientDir,
+    allowReset: process.env.ALLOW_RESET !== "false",
   }),
 );
 
