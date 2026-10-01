@@ -2,6 +2,12 @@
 
 ## Lost-response handling
 
+- The architecture view now shows reserve, dispatch and confirm (steps 10 to 12), with a
+  dispatch counter on the tool node. Two extra paths can be picked: "Lost response, then
+  retry (same key)" and "No confirm in 5 minutes". The workflow list has 15 steps, each
+  with a guardrail. The model is checked against the real service in
+  `tests/architecture-model.test.js`.
+
 - Execution is now reserve, dispatch, confirm. The one-call `execute` composes
   them. The same approval with the same idempotency key returns the stored
   result and never dispatches twice. A different key or changed hash is refused.
