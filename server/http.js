@@ -16,13 +16,17 @@ const MIME = {
 function securityHeaders(contentType = "application/json; charset=utf-8") {
   return {
     "content-type": contentType,
-    "cache-control": contentType.startsWith("text/html") ? "no-store" : "no-cache",
+    "cache-control": contentType.startsWith("application/json") || contentType.startsWith("text/html")
+      ? "no-store"
+      : "no-cache",
     "content-security-policy":
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
     "referrer-policy": "no-referrer",
     "permissions-policy": "camera=(), microphone=(), geolocation=()",
+    "cross-origin-opener-policy": "same-origin",
+    "cross-origin-resource-policy": "same-origin",
   };
 }
 
@@ -31,9 +35,40 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
-async function readJson(request) {
+function httpError(status, message) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+// Browsers can send a cross-site POST without a preflight when the media type
+// is text/plain, even with "application/json" hidden in a parameter. Only an
+// exact application/json media type is accepted, which forces a preflight that
+// this server never grants.
+function isJsonMediaType(header) {
+  return (
+    String(header ?? "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase() === "application/json"
+  );
+}
+
+// A write from a page on another origin carries an Origin header that does not
+// match Host. Requests without Origin (curl, server to server) are unaffected.
+function isCrossOrigin(request) {
+  const origin = request.headers.origin;
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== request.headers.host;
+  } catch {
+    return true;
+  }
+}
+
+async function readJson(request, { object = true } = {}) {
   const contentType = request.headers["content-type"] ?? "";
-  if (!contentType.toLowerCase().includes("application/json")) {
+  if (!isJsonMediaType(contentType)) {
     const error = new Error("Content-Type must be application/json.");
     error.status = 415;
     throw error;
@@ -50,24 +85,38 @@ async function readJson(request) {
     chunks.push(chunk);
   }
   if (chunks.length === 0) return {};
+  let parsed;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    const error = new Error("Request body must contain valid JSON.");
-    error.status = 400;
-    throw error;
+    throw httpError(400, "Request body must contain valid JSON.");
   }
+  if (object && (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))) {
+    throw httpError(400, "Request body must be a JSON object.");
+  }
+  return parsed;
 }
 
 function routeMatch(pathname, pattern) {
   const match = pathname.match(pattern);
-  return match ? match.slice(1).map(decodeURIComponent) : null;
+  if (!match) return null;
+  try {
+    return match.slice(1).map(decodeURIComponent);
+  } catch {
+    throw httpError(400, "Malformed path.");
+  }
 }
 
 function createRateLimiter({ windowMs = 60_000, maxWrites = 120 } = {}) {
   const buckets = new Map();
   return function allow(key) {
     const now = Date.now();
+    // Drop expired buckets so the map cannot grow without bound.
+    if (buckets.size > 1000) {
+      for (const [bucketKey, entry] of buckets) {
+        if (entry.resetAt <= now) buckets.delete(bucketKey);
+      }
+    }
     const bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + windowMs });
@@ -110,13 +159,27 @@ function serveStatic(request, response, clientDir, pathname) {
   createReadStream(filePath).pipe(response);
 }
 
-export function createHttpHandler({ service, scenarios, toolRegistry, clientDir }) {
+export function createHttpHandler({
+  service,
+  scenarios,
+  toolRegistry,
+  clientDir,
+  allowReset = true,
+  log = (message) => console.error(message),
+}) {
   const allowWrite = createRateLimiter({});
 
   return async function handler(request, response) {
     const url = new URL(request.url, "http://gateway.local");
     const method = request.method ?? "GET";
     try {
+      if (url.pathname.startsWith("/api/") && method !== "GET" && isCrossOrigin(request)) {
+        sendJson(response, 403, {
+          error: "cross_origin_blocked",
+          message: "Cross-origin writes are not accepted.",
+        });
+        return;
+      }
       if (url.pathname.startsWith("/api/") && method !== "GET") {
         const key = request.socket.remoteAddress ?? "unknown";
         if (!allowWrite(key)) {
@@ -172,7 +235,11 @@ export function createHttpHandler({ service, scenarios, toolRegistry, clientDir 
         /^\/api\/requests\/([^/]+)\/execute$/,
       );
       if (method === "POST" && executionMatch) {
-        const result = service.execute(executionMatch[0]);
+        const body = await readJson(request);
+        const result = service.execute(executionMatch[0], {
+          requestHash: body.requestHash,
+          actorId: body.actorId,
+        });
         sendJson(response, result.ok ? 200 : result.code === "not_found" ? 404 : 409, result);
         return;
       }
@@ -186,10 +253,22 @@ export function createHttpHandler({ service, scenarios, toolRegistry, clientDir 
         return;
       }
       if (method === "GET" && url.pathname === "/api/audit/verify") {
-        sendJson(response, 200, service.verifyAudit());
+        const anchorSequence = url.searchParams.get("anchorSequence");
+        const anchorHash = url.searchParams.get("anchorHash");
+        sendJson(
+          response,
+          200,
+          service.verifyAudit(
+            anchorSequence && anchorHash ? { anchor: { sequence: anchorSequence, hash: anchorHash } } : {},
+          ),
+        );
         return;
       }
       if (method === "POST" && url.pathname === "/api/reset") {
+        if (!allowReset) {
+          sendJson(response, 403, { error: "reset_disabled", message: "Reset is disabled." });
+          return;
+        }
         await readJson(request);
         sendJson(response, 200, service.reset());
         return;
@@ -204,9 +283,10 @@ export function createHttpHandler({ service, scenarios, toolRegistry, clientDir 
       }
       serveStatic(request, response, clientDir, url.pathname);
     } catch (error) {
-      sendJson(response, error.status ?? 500, {
-        error: error.status ? "invalid_request" : "internal_error",
-        message: error instanceof Error ? error.message : "Unexpected error.",
+      if (!error?.status) log(`Unhandled error: ${error instanceof Error ? error.stack : error}`);
+      sendJson(response, error?.status ?? 500, {
+        error: error?.status ? "invalid_request" : "internal_error",
+        message: error?.status ? error.message : "Unexpected error.",
       });
     }
   };

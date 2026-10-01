@@ -1,28 +1,60 @@
-// Browser demo API client — exposes the same interface as the /api routes.
-// Parses the path+method that App.jsx passes to api() and dispatches to the
-// in-memory gateway service. No network requests, no credentials.
+// Browser demo API client. It answers the same /api routes as server/http.js by
+// calling the in-browser gateway service. No network requests, no credentials.
 
 import { SCENARIOS, TOOL_REGISTRY } from "./scenarios.js";
 import { createStore } from "./store.js";
 import { createGatewayService } from "./service.js";
 
-// ─── Singleton service (persists across React renders) ────────────────────────
-const store = createStore();
-const service = createGatewayService({ store });
+const CLOCK_KEY = "mcp_gateway_demo_clock_v1";
 
-// Seed the audit chain with a genesis reset on first load.
-let _initialized = false;
-async function ensureInitialized() {
-  if (_initialized) return;
-  _initialized = true;
-  // Only reset if there's no existing state (fresh tab).
-  if (store.listRequests(1).length === 0 && (await store.verifyAuditChain()).checkedEvents === 0) {
-    await service.reset("demo-startup");
+function readOffset() {
+  try {
+    const value = Number(localStorage.getItem(CLOCK_KEY));
+    return Number.isFinite(value) ? value : 0;
+  } catch {
+    return 0;
   }
 }
 
-// ─── Route dispatcher ─────────────────────────────────────────────────────────
-// Mirrors the HTTP API contract defined in server/http.js and docs/openapi.yaml.
+function writeOffset(value) {
+  try {
+    if (value === 0) localStorage.removeItem(CLOCK_KEY);
+    else localStorage.setItem(CLOCK_KEY, String(value));
+  } catch {
+    // ignore
+  }
+}
+
+// The lab clock is the real clock plus an offset the visitor can move forward
+// to watch an authorization expire. It never moves backwards.
+let clockOffsetMs = readOffset();
+const labNow = () => new Date(Date.now() + clockOffsetMs);
+
+const store = createStore();
+const service = createGatewayService({ store, clock: labNow });
+
+// One shared promise, so parallel first calls wait for the same start-up reset.
+let initialization = null;
+function ensureInitialized() {
+  initialization ??= (async () => {
+    if (store.listRequests(1).length === 0 && (await store.verifyAuditChain()).checkedEvents === 0) {
+      await service.reset("demo-startup");
+    }
+  })();
+  return initialization;
+}
+
+function fail(message, payload) {
+  const error = new Error(message);
+  error.payload = payload;
+  return error;
+}
+
+async function unwrap(promise, fallbackMessage) {
+  const result = await promise;
+  if (!result.ok) throw fail(result.message ?? fallbackMessage, result);
+  return result;
+}
 
 /**
  * Drop-in replacement for the api(path, options) helper in App.jsx.
@@ -32,84 +64,79 @@ export async function demoApiAdapter(path, options = {}) {
   await ensureInitialized();
 
   const method = (options.method ?? "GET").toUpperCase();
-  const body = options.body ? JSON.parse(options.body) : null;
+  const body = options.body ? JSON.parse(options.body) : {};
+  const url = new URL(path, "http://demo.local");
+  const route = url.pathname;
 
-  // GET /api/scenarios
-  if (path === "/api/scenarios" && method === "GET") {
-    return {
-      scenarios: SCENARIOS,
-      tools: Object.values(TOOL_REGISTRY),
-      syntheticDataOnly: true,
-    };
+  if (route === "/api/scenarios" && method === "GET") {
+    return { scenarios: SCENARIOS, tools: Object.values(TOOL_REGISTRY), syntheticDataOnly: true };
   }
-
-  // GET /api/requests
-  if (path === "/api/requests" && method === "GET") {
+  if (route === "/api/requests" && method === "GET") {
     return { requests: service.list(100) };
   }
-
-  // POST /api/requests
-  if (path === "/api/requests" && method === "POST") {
-    const result = await service.submit(body);
-    if (!result.ok) {
-      const error = new Error(result.message ?? "Submission failed.");
-      error.payload = result;
-      throw error;
-    }
-    return result;
+  if (route === "/api/requests" && method === "POST") {
+    return unwrap(service.submit(body), "Submission failed.");
   }
 
-  // POST /api/requests/:id/decision
-  const decisionMatch = path.match(/^\/api\/requests\/([^/]+)\/decision$/);
+  const decisionMatch = route.match(/^\/api\/requests\/([^/]+)\/decision$/);
   if (decisionMatch && method === "POST") {
-    const id = decisionMatch[1];
-    const result = await service.decide(id, body);
-    if (!result.ok) {
-      const error = new Error(result.message ?? "Decision failed.");
-      error.payload = result;
-      throw error;
-    }
-    return result;
+    return unwrap(service.decide(decisionMatch[1], body), "Decision failed.");
   }
 
-  // POST /api/requests/:id/execute
-  const executeMatch = path.match(/^\/api\/requests\/([^/]+)\/execute$/);
+  const executeMatch = route.match(/^\/api\/requests\/([^/]+)\/execute$/);
   if (executeMatch && method === "POST") {
-    const id = executeMatch[1];
-    const result = await service.execute(id);
-    if (!result.ok) {
-      const error = new Error(result.message ?? "Execution failed.");
-      error.payload = result;
-      throw error;
-    }
-    return result;
+    return unwrap(
+      service.execute(executeMatch[1], { requestHash: body.requestHash, actorId: body.actorId }),
+      "Execution failed.",
+    );
   }
 
-  // GET /api/audit
-  if (path.startsWith("/api/audit") && !path.includes("/verify") && method === "GET") {
-    const url = new URL(path, "http://x");
+  if (route === "/api/audit" && method === "GET") {
     const limit = Number(url.searchParams.get("limit") || 100);
-    const requestId = url.searchParams.get("requestId") || null;
-    return { events: service.audit(requestId, limit) };
+    return { events: service.audit(url.searchParams.get("requestId") || null, limit) };
   }
-
-  // GET /api/audit/verify
-  if (path === "/api/audit/verify" && method === "GET") {
-    return await service.verifyAudit();
+  if (route === "/api/audit/verify" && method === "GET") {
+    const sequence = url.searchParams.get("anchorSequence");
+    const hash = url.searchParams.get("anchorHash");
+    return service.verifyAudit(sequence && hash ? { anchor: { sequence, hash } } : {});
   }
-
-  // POST /api/reset
-  if (path === "/api/reset" && method === "POST") {
-    const result = await service.reset();
-    return result;
+  if (route === "/api/reset" && method === "POST") {
+    clockOffsetMs = 0;
+    writeOffset(0);
+    return service.reset();
   }
-
-  // GET /api/health
-  if (path === "/api/health" && method === "GET") {
+  if (route === "/api/health" && method === "GET") {
     return { status: "ok", syntheticDataOnly: true, mode: "browser-demo" };
   }
 
-  const error = new Error(`Demo adapter: unknown route ${method} ${path}`);
-  error.payload = { error: "not_found" };
-  throw error;
+  // Lab-only controls. The server has no equivalent routes.
+  if (route === "/api/lab" && method === "GET") {
+    return { clockOffsetMs, now: labNow().toISOString() };
+  }
+  if (route === "/api/lab/advance-clock" && method === "POST") {
+    const minutes = Number(body.minutes);
+    if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) {
+      throw fail("Minutes must be between 1 and 1440.", { code: "invalid_minutes" });
+    }
+    clockOffsetMs += minutes * 60_000;
+    writeOffset(clockOffsetMs);
+    return { clockOffsetMs, now: labNow().toISOString() };
+  }
+  if (route === "/api/lab/tamper" && method === "POST") {
+    // Edit a stored audit event in place and leave every hash alone. Verification
+    // should then fail at exactly that event.
+    const events = store.listAudit(null, 1000);
+    const target =
+      body.sequence !== undefined
+        ? events.find((event) => event.sequence === Number(body.sequence))
+        : events.find((event) => event.eventType.startsWith("policy.")) ?? events[events.length - 1];
+    if (!target || !store.tamperAuditEvent(target.sequence, { tampered: true })) {
+      throw fail("There is no audit event to tamper with yet. Run a scenario first.", {
+        code: "nothing_to_tamper",
+      });
+    }
+    return { ok: true, sequence: target.sequence };
+  }
+
+  throw fail(`Demo adapter: unknown route ${method} ${path}`, { error: "not_found" });
 }

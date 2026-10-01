@@ -1,12 +1,16 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+// Stable serialization: object keys sorted, no whitespace, and properties whose
+// value is undefined are left out, exactly as JSON.stringify would. That keeps
+// the hash the same after a round trip through the database.
 function canonicalJson(value) {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   return `{${Object.keys(value)
+    .filter((key) => value[key] !== undefined)
     .sort()
     .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
     .join(",")}}`;
@@ -14,6 +18,15 @@ function canonicalJson(value) {
 
 function hashEvent(event) {
   return createHash("sha256").update(canonicalJson(event)).digest("hex");
+}
+
+function signHash(key, eventHash) {
+  return createHmac("sha256", key).update(eventHash).digest("hex");
+}
+
+function signaturesMatch(expected, actual) {
+  if (typeof actual !== "string" || actual.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(actual));
 }
 
 function parseJson(value, fallback) {
@@ -51,6 +64,8 @@ function mapRequest(row) {
     approvalRole: row.approval_role,
     authorizationExpiresAt: row.authorization_expires_at,
     aiAnalysis: parseJson(row.ai_analysis, null),
+    arguments: parseJson(row.arguments, {}),
+    requestHash: row.request_hash,
     executionId: row.execution_id,
     executedAt: row.executed_at,
     version: row.version,
@@ -68,6 +83,7 @@ function mapDecision(row) {
     reason: row.reason,
     createdAt: row.created_at,
     authorizationExpiresAt: row.authorization_expires_at,
+    requestHash: row.request_hash,
   };
 }
 
@@ -82,11 +98,22 @@ function mapAudit(row) {
     payload: parseJson(row.payload, {}),
     previousHash: row.previous_hash,
     eventHash: row.event_hash,
+    signature: row.signature ?? null,
     createdAt: row.created_at,
   };
 }
 
-export function createStore(databasePath = ":memory:") {
+function ensureColumn(db, table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((entry) => entry.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+// auditKey is optional. With it, every audit event also carries an HMAC of its
+// hash, and verification refuses events that were not signed with the key. A
+// database writer who does not hold the key can no longer recompute the chain.
+export function createStore(databasePath = ":memory:", { auditKey = null } = {}) {
   if (databasePath !== ":memory:") mkdirSync(dirname(databasePath), { recursive: true });
   const db = new DatabaseSync(databasePath);
   db.exec("PRAGMA journal_mode = WAL;");
@@ -147,50 +174,67 @@ export function createStore(databasePath = ":memory:") {
     );
   `);
 
+  // Databases created before these columns existed are upgraded in place.
+  ensureColumn(db, "requests", "arguments", "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, "requests", "request_hash", "TEXT");
+  ensureColumn(db, "decisions", "request_hash", "TEXT");
+  ensureColumn(db, "audit_events", "signature", "TEXT");
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_decisions_request ON decisions(request_id);",
+  );
+
   const insertRequest = db.prepare(`
     INSERT INTO requests (
       id, created_at, updated_at, actor_id, actor_type, tool_id, action, resource,
       environment, data_classification, justification, context, requested_scopes,
       existing_scopes, parent_request_id, risk_score, risk_level, status,
       policy_decision, policy_reasons, policy_controls, approval_role,
-      authorization_expires_at, ai_analysis, version
+      authorization_expires_at, ai_analysis, arguments, request_hash, version
     ) VALUES (
       @id, @createdAt, @updatedAt, @actorId, @actorType, @toolId, @action, @resource,
       @environment, @dataClassification, @justification, @context, @requestedScopes,
       @existingScopes, @parentRequestId, @riskScore, @riskLevel, @status,
       @policyDecision, @policyReasons, @policyControls, @approvalRole,
-      @authorizationExpiresAt, @aiAnalysis, 1
+      @authorizationExpiresAt, @aiAnalysis, @arguments, @requestHash, 1
     )
   `);
 
   function appendAudit({ requestId = null, eventType, actor, payload = {}, createdAt }) {
     const last = db
-      .prepare("SELECT event_hash FROM audit_events ORDER BY sequence DESC LIMIT 1")
+      .prepare("SELECT sequence, event_hash FROM audit_events ORDER BY sequence DESC LIMIT 1")
       .get();
     const previousHash = last?.event_hash ?? "GENESIS";
+    const sequence = (last?.sequence ?? 0) + 1;
     const eventId = randomUUID();
+    // Round trip through JSON so the hashed payload is exactly what gets stored.
+    const storedPayload = JSON.parse(JSON.stringify(payload));
     const content = {
+      sequence,
       eventId,
       requestId,
       eventType,
       actor,
-      payload,
+      payload: storedPayload,
       previousHash,
       createdAt,
     };
     const eventHash = hashEvent(content);
+    const signature = auditKey ? signHash(auditKey, eventHash) : null;
     db.prepare(`
       INSERT INTO audit_events (
-        event_id, request_id, event_type, actor, payload, previous_hash, event_hash, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        sequence, event_id, request_id, event_type, actor, payload, previous_hash,
+        event_hash, signature, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
+      sequence,
       eventId,
       requestId,
       eventType,
       actor,
-      canonicalJson(payload),
+      canonicalJson(storedPayload),
       previousHash,
       eventHash,
+      signature,
       createdAt,
     );
     return mapAudit(
@@ -230,6 +274,8 @@ export function createStore(databasePath = ":memory:") {
         approvalRole: request.approvalRole,
         authorizationExpiresAt: request.authorizationExpiresAt,
         aiAnalysis: canonicalJson(request.aiAnalysis),
+        arguments: canonicalJson(request.arguments ?? {}),
+        requestHash: request.requestHash ?? null,
       });
       return this.getRequest(request.id);
     },
@@ -257,7 +303,7 @@ export function createStore(databasePath = ":memory:") {
     listRequests(limit = 100) {
       const safeLimit = Math.max(1, Math.min(250, Number(limit) || 100));
       return db
-        .prepare("SELECT * FROM requests ORDER BY created_at DESC LIMIT ?")
+        .prepare("SELECT * FROM requests ORDER BY created_at DESC, rowid DESC LIMIT ?")
         .all(safeLimit)
         .map(mapRequest);
     },
@@ -294,8 +340,8 @@ export function createStore(databasePath = ":memory:") {
       db.prepare(`
         INSERT INTO decisions (
           id, request_id, reviewer_id, reviewer_role, decision, reason,
-          created_at, authorization_expires_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          created_at, authorization_expires_at, request_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         decision.id,
         decision.requestId,
@@ -305,6 +351,7 @@ export function createStore(databasePath = ":memory:") {
         decision.reason,
         decision.createdAt,
         decision.authorizationExpiresAt,
+        decision.requestHash ?? null,
       );
       return mapDecision(db.prepare("SELECT * FROM decisions WHERE id = ?").get(decision.id));
     },
@@ -341,6 +388,23 @@ export function createStore(databasePath = ":memory:") {
         throw error;
       }
     },
+    // Append one audit event in its own transaction (for events that are not
+    // part of a state change, such as a blocked execution attempt).
+    recordAudit(auditEvent) {
+      db.exec("BEGIN IMMEDIATE;");
+      try {
+        const audit = appendAudit(auditEvent);
+        db.exec("COMMIT;");
+        return audit;
+      } catch (error) {
+        try {
+          db.exec("ROLLBACK;");
+        } catch {
+          // Preserve the original transaction error.
+        }
+        throw error;
+      }
+    },
     transitionWithAudit(id, expectedVersion, changes, auditEvent) {
       db.exec("BEGIN IMMEDIATE;");
       try {
@@ -365,14 +429,14 @@ export function createStore(databasePath = ":memory:") {
       return mapDecision(
         db
           .prepare(
-            "SELECT * FROM decisions WHERE request_id = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM decisions WHERE request_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1",
           )
           .get(requestId),
       );
     },
     listDecisions(requestId) {
       return db
-        .prepare("SELECT * FROM decisions WHERE request_id = ? ORDER BY created_at DESC")
+        .prepare("SELECT * FROM decisions WHERE request_id = ? ORDER BY created_at DESC, rowid DESC")
         .all(requestId)
         .map(mapDecision);
     },
@@ -390,11 +454,27 @@ export function createStore(databasePath = ":memory:") {
             .all(safeLimit);
       return rows.map(mapAudit);
     },
-    verifyAuditChain() {
+    // Checks, in order, for every event: the sequence number follows the one
+    // before it, the previous-hash link matches, the recomputed hash matches and,
+    // when a key is configured, the HMAC matches. An anchor (a sequence number
+    // and head hash saved somewhere else) additionally detects truncation.
+    verifyAuditChain({ anchor = null } = {}) {
       const rows = db.prepare("SELECT * FROM audit_events ORDER BY sequence ASC").all();
       let previousHash = "GENESIS";
+      let previousSequence = null;
+      const fail = (row, reason) => ({
+        valid: false,
+        checkedEvents: rows.length,
+        failedSequence: row.sequence,
+        reason,
+        signed: Boolean(auditKey),
+      });
       for (const row of rows) {
+        if (previousSequence !== null && row.sequence !== previousSequence + 1) {
+          return fail(row, "sequence_gap");
+        }
         const content = {
+          sequence: row.sequence,
           eventId: row.event_id,
           requestId: row.request_id,
           eventType: row.event_type,
@@ -403,20 +483,33 @@ export function createStore(databasePath = ":memory:") {
           previousHash: row.previous_hash,
           createdAt: row.created_at,
         };
-        const expectedHash = hashEvent(content);
-        if (row.previous_hash !== previousHash || row.event_hash !== expectedHash) {
+        if (row.previous_hash !== previousHash) return fail(row, "link_broken");
+        if (row.event_hash !== hashEvent(content)) return fail(row, "hash_mismatch");
+        if (auditKey && !signaturesMatch(signHash(auditKey, row.event_hash), row.signature)) {
+          return fail(row, "signature_invalid");
+        }
+        previousHash = row.event_hash;
+        previousSequence = row.sequence;
+      }
+      if (anchor) {
+        const anchored = rows.find((row) => row.sequence === Number(anchor.sequence));
+        if (!anchored || anchored.event_hash !== anchor.hash) {
           return {
             valid: false,
             checkedEvents: rows.length,
-            failedSequence: row.sequence,
+            failedSequence: Number(anchor.sequence),
+            reason: "anchor_mismatch",
+            signed: Boolean(auditKey),
           };
         }
-        previousHash = row.event_hash;
       }
       return {
         valid: true,
         checkedEvents: rows.length,
+        headSequence: previousSequence,
         headHash: previousHash,
+        signed: Boolean(auditKey),
+        anchorChecked: Boolean(anchor),
       };
     },
     clear() {
@@ -444,4 +537,4 @@ export function createStore(databasePath = ":memory:") {
   };
 }
 
-export { canonicalJson, hashEvent };
+export { canonicalJson, hashEvent, signHash };

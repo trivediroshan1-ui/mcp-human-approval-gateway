@@ -1,10 +1,32 @@
 import { randomUUID } from "node:crypto";
-import { analyzeRequest } from "./ai-analyzer.js";
-import { evaluatePolicy, reviewerCanApprove } from "./policy.js";
+import { analyzeRequest, decisionPackageFor, offlineAnalysis } from "./ai-analyzer.js";
+import {
+  bindingPayload,
+  evaluatePolicy,
+  REVIEW_WINDOW_MINUTES,
+  reviewerCanApprove,
+  reviewerCanDecide,
+  ttlMinutesFor,
+} from "./policy.js";
 import { scenarioById } from "./scenarios.js";
+import { hashEvent } from "./store.js";
 
 function plusMinutes(iso, minutes) {
   return new Date(new Date(iso).getTime() + minutes * 60_000).toISOString();
+}
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sameIdentity(a, b) {
+  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+}
+
+// The hash an approval is bound to. It is recomputed from the stored request
+// every time it matters, so a row edited after approval no longer matches.
+export function requestHashOf(request) {
+  return hashEvent(bindingPayload(request));
 }
 
 function publicRequest(request, store) {
@@ -22,6 +44,18 @@ export function createGatewayService({
 } = {}) {
   if (!store) throw new Error("A store is required");
 
+  function blockExecution(request, actor, code, message, extra = {}) {
+    const now = clock().toISOString();
+    store.recordAudit({
+      requestId: request.id,
+      eventType: "execution.blocked",
+      actor,
+      createdAt: now,
+      payload: { code, status: request.status, ...extra },
+    });
+    return { ok: false, code, message };
+  }
+
   return {
     async submit(rawInput, actor = "gateway-api") {
       const scenario = rawInput?.scenarioId ? scenarioById(rawInput.scenarioId) : null;
@@ -33,19 +67,30 @@ export function createGatewayService({
       const now = clock().toISOString();
       const authorizationExpiresAt =
         policy.decision === "allow" ? plusMinutes(now, policy.ttlMinutes) : null;
-      const aiAnalysis = await analyzer(policy.input, policy);
+      const requestHash = requestHashOf(policy.input);
+
+      // The analysis is stored for the reviewer and has no path back into the
+      // decision. If the analyst fails, the offline rules stand in.
+      let aiAnalysis;
+      try {
+        aiAnalysis = await analyzer(policy.input, policy);
+      } catch {
+        aiAnalysis = { ...offlineAnalysis(policy.input, policy), provider: "offline-fallback" };
+      }
 
       // Decision-package gate: if policy requires a human but the agent's own
-      // analysis is incomplete (no options considered, no recommendation, no
-      // confidence), reject the handoff before a human ever sees it.
-      const gateRejected =
-        policy.decision === "require_human" && aiAnalysis.decisionPackage?.complete === false;
+      // handoff is incomplete (no options considered, no recommendation, no
+      // confidence), reject it before a human sees it. The gate reads the
+      // request through decisionPackageFor, never the analyst output.
+      const handoff = decisionPackageFor(policy.input, policy);
+      const gateRejected = policy.decision === "require_human" && handoff.complete === false;
 
       const requestInput = {
         id: randomUUID(),
         createdAt: now,
         updatedAt: now,
         ...policy.input,
+        requestHash,
         riskScore: policy.score,
         riskLevel: policy.level,
         status: gateRejected ? "gate_rejected" : policy.status,
@@ -66,6 +111,7 @@ export function createGatewayService({
             toolId: requestInput.toolId,
             action: requestInput.action,
             environment: requestInput.environment,
+            requestHash,
           },
         },
         {
@@ -73,9 +119,11 @@ export function createGatewayService({
           actor: "deterministic-policy",
           createdAt: now,
           payload: {
+            policyVersion: policy.policyVersion,
             riskScore: requestInput.riskScore,
             riskLevel: requestInput.riskLevel,
             requiredRole: requestInput.approvalRole,
+            denyCode: policy.denyCode,
             reasons: requestInput.policyReasons,
           },
         },
@@ -85,6 +133,7 @@ export function createGatewayService({
           createdAt: now,
           payload: {
             summary: requestInput.aiAnalysis.summary,
+            modelCalled: requestInput.aiAnalysis.modelCalled === true,
             advisoryOnly: true,
           },
         },
@@ -95,7 +144,7 @@ export function createGatewayService({
                 actor: "decision-package-gate",
                 createdAt: now,
                 payload: {
-                  gap: aiAnalysis.decisionPackage.gap,
+                  gap: handoff.gap,
                   wouldHaveRequired: requestInput.approvalRole,
                 },
               },
@@ -124,16 +173,45 @@ export function createGatewayService({
           message: `A decision cannot be recorded while the request is ${request.status}.`,
         };
       }
-
-      const reviewerId = String(input.reviewerId ?? "").trim();
-      const reviewerRole = String(input.reviewerRole ?? "").trim();
-      const decision = String(input.decision ?? "").trim().toLowerCase();
-      const reason = String(input.reason ?? "").trim();
-      if (!reviewerId || !["approve", "deny"].includes(decision) || reason.length < 12) {
+      if (!isObject(input)) {
         return {
           ok: false,
           code: "invalid_decision",
-          message: "Reviewer, approve/deny decision and a meaningful reason are required.",
+          message: "The decision must be a JSON object.",
+        };
+      }
+
+      const reviewerId = typeof input.reviewerId === "string" ? input.reviewerId.trim() : "";
+      const reviewerRole = typeof input.reviewerRole === "string" ? input.reviewerRole.trim() : "";
+      const decision = typeof input.decision === "string" ? input.decision.trim().toLowerCase() : "";
+      const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+      if (
+        !reviewerId ||
+        reviewerId.length > 128 ||
+        /[\u0000-\u001f\u007f]/.test(reviewerId) ||
+        !["approve", "deny"].includes(decision) ||
+        reason.length < 12 ||
+        reason.length > 1000
+      ) {
+        return {
+          ok: false,
+          code: "invalid_decision",
+          message:
+            "Reviewer, approve/deny decision and a reason of 12 to 1000 characters are required.",
+        };
+      }
+      if (!reviewerCanDecide(reviewerRole)) {
+        return {
+          ok: false,
+          code: "insufficient_role",
+          message: "The reviewer role cannot decide on requests.",
+        };
+      }
+      if (decision === "approve" && sameIdentity(reviewerId, request.actorId)) {
+        return {
+          ok: false,
+          code: "self_approval",
+          message: "A requester cannot approve its own request.",
         };
       }
       if (decision === "approve" && !reviewerCanApprove(reviewerRole, request.approvalRole)) {
@@ -145,14 +223,51 @@ export function createGatewayService({
       }
 
       const now = clock().toISOString();
-      const ttlMinutes =
-        request.riskLevel === "critical"
-          ? 10
-          : request.riskLevel === "high"
-            ? 15
-            : 30;
+
+      // A request that waited too long is no longer the thing the agent asked
+      // for. It expires and has to be submitted again.
+      const queuedUntil = Date.parse(request.createdAt) + REVIEW_WINDOW_MINUTES * 60_000;
+      if (!(Date.parse(now) <= queuedUntil)) {
+        const expired = store.transitionWithAudit(
+          request.id,
+          request.version,
+          { status: "expired", updatedAt: now },
+          {
+            eventType: "review.expired",
+            actor: "mcp-execution-guard",
+            createdAt: now,
+            payload: { reviewWindowMinutes: REVIEW_WINDOW_MINUTES },
+          },
+        );
+        return {
+          ok: false,
+          code: expired.ok ? "review_window_elapsed" : expired.reason,
+          message: "The review window has passed. Submit the request again.",
+        };
+      }
+
+      // The stored request must still be the one the policy evaluated.
+      if (requestHashOf(request) !== request.requestHash) {
+        store.transitionWithAudit(
+          request.id,
+          request.version,
+          { status: "denied", updatedAt: now },
+          {
+            eventType: "request.integrity_failed",
+            actor: "mcp-execution-guard",
+            createdAt: now,
+            payload: { expectedHash: request.requestHash, stage: "decision" },
+          },
+        );
+        return {
+          ok: false,
+          code: "integrity_failed",
+          message: "The stored request no longer matches its hash. It was denied.",
+        };
+      }
+
       const authorizationExpiresAt =
-        decision === "approve" ? plusMinutes(now, ttlMinutes) : null;
+        decision === "approve" ? plusMinutes(now, ttlMinutesFor(request.riskLevel)) : null;
       const committed = store.recordDecisionAndTransition(
         {
           id: randomUUID(),
@@ -163,6 +278,7 @@ export function createGatewayService({
           reason,
           createdAt: now,
           authorizationExpiresAt,
+          requestHash: request.requestHash,
         },
         request.version,
         {
@@ -178,6 +294,7 @@ export function createGatewayService({
             reason,
             authorizationExpiresAt,
             requiredRole: request.approvalRole,
+            requestHash: request.requestHash,
           },
         },
       );
@@ -196,29 +313,80 @@ export function createGatewayService({
       };
     },
 
-    execute(id, actor = "mcp-execution-guard") {
+    // options.requestHash and options.actorId are what the caller says it is
+    // about to run and who it is. When given, they must match the approval.
+    execute(id, options = {}) {
+      const settings = typeof options === "string" ? { actor: options } : (options ?? {});
+      const actor = typeof settings.actor === "string" ? settings.actor : "mcp-execution-guard";
+      const presentedHash = typeof settings.requestHash === "string" ? settings.requestHash : null;
+      const presentedActor = typeof settings.actorId === "string" ? settings.actorId : null;
+
       const request = store.getRequest(id);
       if (!request) return { ok: false, code: "not_found", message: "Request not found." };
       if (request.executionId) {
-        return {
-          ok: false,
-          code: "replay_blocked",
-          message: "This authorization has already been consumed.",
-        };
+        return blockExecution(
+          request,
+          actor,
+          "replay_blocked",
+          "This authorization has already been consumed.",
+        );
       }
       if (!["approved", "auto_approved"].includes(request.status)) {
-        return {
-          ok: false,
-          code: "not_authorized",
-          message: `Execution is blocked while the request is ${request.status}.`,
-        };
+        return blockExecution(
+          request,
+          actor,
+          "not_authorized",
+          `Execution is blocked while the request is ${request.status}.`,
+        );
+      }
+      if (presentedActor !== null && !sameIdentity(presentedActor, request.actorId)) {
+        return blockExecution(
+          request,
+          actor,
+          "actor_mismatch",
+          "The authorization was issued to a different requester.",
+        );
       }
 
       const now = clock().toISOString();
-      if (
-        !request.authorizationExpiresAt ||
-        new Date(request.authorizationExpiresAt).getTime() <= new Date(now).getTime()
-      ) {
+
+      // Integrity first: the stored request must hash to the value policy
+      // evaluated, and a human approval must carry that same hash. Any
+      // difference revokes the authorization.
+      const approval = request.status === "approved" ? store.latestDecision(request.id) : null;
+      const recomputed = requestHashOf(request);
+      const approvedHash = approval ? approval.requestHash : request.requestHash;
+      if (recomputed !== request.requestHash || recomputed !== approvedHash) {
+        store.transitionWithAudit(
+          request.id,
+          request.version,
+          { status: "denied", updatedAt: now },
+          {
+            eventType: "request.integrity_failed",
+            actor,
+            createdAt: now,
+            payload: { expectedHash: request.requestHash, stage: "execution" },
+          },
+        );
+        return {
+          ok: false,
+          code: "integrity_failed",
+          message: "The stored request no longer matches the approved hash. Authorization revoked.",
+        };
+      }
+      if (presentedHash !== null && presentedHash !== request.requestHash) {
+        return blockExecution(
+          request,
+          actor,
+          "binding_mismatch",
+          "The action presented for execution is not the action that was approved.",
+          { presentedHash },
+        );
+      }
+
+      // Fail closed: a missing or unreadable expiry counts as expired.
+      const expiresAt = Date.parse(request.authorizationExpiresAt ?? "");
+      if (!(expiresAt > Date.parse(now))) {
         const expired = store.transitionWithAudit(
           request.id,
           request.version,
@@ -242,6 +410,8 @@ export function createGatewayService({
         };
       }
 
+      // Consume. The version check inside the transaction is what makes this
+      // single-use: of two callers holding the same version, one wins.
       const executionId = randomUUID();
       const updated = store.transitionWithAudit(
         request.id,
@@ -262,10 +432,20 @@ export function createGatewayService({
             toolId: request.toolId,
             action: request.action,
             resource: request.resource,
+            requestHash: request.requestHash,
           },
         },
       );
       if (!updated.ok) {
+        const current = store.getRequest(id);
+        if (current?.executionId) {
+          return blockExecution(
+            current,
+            actor,
+            "replay_blocked",
+            "This authorization has already been consumed.",
+          );
+        }
         return {
           ok: false,
           code: updated.reason,
@@ -287,8 +467,8 @@ export function createGatewayService({
       return store.listAudit(requestId, limit);
     },
 
-    verifyAudit() {
-      return store.verifyAuditChain();
+    verifyAudit(options) {
+      return store.verifyAuditChain(options);
     },
 
     reset(actor = "demo-operator") {

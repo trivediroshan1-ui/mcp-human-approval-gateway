@@ -1,6 +1,15 @@
-// Browser-compatible copy of server/scenarios.js — no Node.js dependencies.
+// Browser-compatible copy of server/scenarios.js. No Node.js dependencies.
+// Keep it identical to the server copy; tests/parity.test.js enforces that.
 
-export const TOOL_REGISTRY = Object.freeze({
+function deepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const key of Object.keys(value)) deepFreeze(value[key]);
+  }
+  return value;
+}
+
+export const TOOL_REGISTRY = deepFreeze({
   "docs.search": {
     id: "docs.search",
     label: "Public documentation search",
@@ -8,6 +17,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 8,
     allowedActions: ["read"],
     allowedScopes: ["public:docs"],
+    allowedResourceSchemes: ["public"],
     sensitivity: "public",
     destructive: false,
     credentialAccess: false,
@@ -21,6 +31,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 32,
     allowedActions: ["read"],
     allowedScopes: ["repo:read"],
+    allowedResourceSchemes: ["repo"],
     sensitivity: "confidential",
     destructive: false,
     credentialAccess: false,
@@ -34,6 +45,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 72,
     allowedActions: ["read-metadata"],
     allowedScopes: ["secrets:metadata"],
+    allowedResourceSchemes: ["vault"],
     sensitivity: "restricted",
     destructive: false,
     credentialAccess: true,
@@ -47,6 +59,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 82,
     allowedActions: ["grant", "revoke"],
     allowedScopes: ["iam:roles:write"],
+    allowedResourceSchemes: ["identity"],
     sensitivity: "restricted",
     destructive: false,
     credentialAccess: false,
@@ -60,6 +73,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 78,
     allowedActions: ["deploy"],
     allowedScopes: ["deploy:production"],
+    allowedResourceSchemes: ["service"],
     sensitivity: "confidential",
     destructive: false,
     credentialAccess: false,
@@ -73,6 +87,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 88,
     allowedActions: ["delete"],
     allowedScopes: ["storage:delete"],
+    allowedResourceSchemes: ["storage"],
     sensitivity: "restricted",
     destructive: true,
     credentialAccess: false,
@@ -86,6 +101,7 @@ export const TOOL_REGISTRY = Object.freeze({
     baseRisk: 15,
     allowedActions: ["create"],
     allowedScopes: ["ticket:create"],
+    allowedResourceSchemes: ["ticket"],
     sensitivity: "internal",
     destructive: false,
     credentialAccess: false,
@@ -94,12 +110,19 @@ export const TOOL_REGISTRY = Object.freeze({
   },
 });
 
-export const SCENARIOS = Object.freeze([
+export const SCENARIOS = deepFreeze([
   {
     id: "public-research",
     title: "Research public guidance",
     description: "An agent searches public security documentation.",
     expected: "Auto-approve",
+    expect: {
+      policyDecision: "allow",
+      status: "auto_approved",
+      riskLevel: "low",
+      approvalRole: null,
+      denyCode: null,
+    },
     request: {
       actorId: "agent-research-01",
       actorType: "ai-agent",
@@ -119,6 +142,13 @@ export const SCENARIOS = Object.freeze([
     title: "Review a private repository",
     description: "An engineering agent requests read-only access to private source.",
     expected: "Human review",
+    expect: {
+      policyDecision: "require_human",
+      status: "pending_human",
+      riskLevel: "medium",
+      approvalRole: "resource-owner",
+      denyCode: null,
+    },
     request: {
       actorId: "agent-code-review-02",
       actorType: "ai-agent",
@@ -138,6 +168,13 @@ export const SCENARIOS = Object.freeze([
     title: "Inspect secret metadata",
     description: "An agent needs secret age and ownership, not secret values.",
     expected: "Human review",
+    expect: {
+      policyDecision: "require_human",
+      status: "pending_human",
+      riskLevel: "critical",
+      approvalRole: "security-lead",
+      denyCode: null,
+    },
     request: {
       actorId: "agent-credential-03",
       actorType: "ai-agent",
@@ -157,6 +194,13 @@ export const SCENARIOS = Object.freeze([
     title: "Grant an administrative role",
     description: "An agent proposes a production IAM privilege change.",
     expected: "Security-lead approval",
+    expect: {
+      policyDecision: "require_human",
+      status: "pending_human",
+      riskLevel: "critical",
+      approvalRole: "security-lead",
+      denyCode: null,
+    },
     request: {
       actorId: "agent-iam-04",
       actorType: "ai-agent",
@@ -176,6 +220,13 @@ export const SCENARIOS = Object.freeze([
     title: "Injected tool instruction",
     description: "Untrusted context attempts to override gateway controls.",
     expected: "Deny",
+    expect: {
+      policyDecision: "deny",
+      status: "denied",
+      riskLevel: "critical",
+      approvalRole: null,
+      denyCode: "injection",
+    },
     request: {
       actorId: "agent-support-05",
       actorType: "ai-agent",
@@ -196,6 +247,13 @@ export const SCENARIOS = Object.freeze([
     title: "Privilege expansion during execution",
     description: "A read-only agent asks for a wildcard scope after starting work.",
     expected: "Deny and resubmit",
+    expect: {
+      policyDecision: "deny",
+      status: "denied",
+      riskLevel: "critical",
+      approvalRole: null,
+      denyCode: "scope_outside_contract",
+    },
     request: {
       actorId: "agent-code-review-06",
       actorType: "ai-agent",
@@ -215,6 +273,13 @@ export const SCENARIOS = Object.freeze([
     title: "Deploy to production",
     description: "An agent proposes a production configuration change.",
     expected: "Security-lead approval",
+    expect: {
+      policyDecision: "require_human",
+      status: "pending_human",
+      riskLevel: "critical",
+      approvalRole: "security-lead",
+      denyCode: null,
+    },
     request: {
       actorId: "agent-release-07",
       actorType: "ai-agent",
@@ -234,6 +299,13 @@ export const SCENARIOS = Object.freeze([
     title: "Invoke an unregistered tool",
     description: "An agent attempts to use a tool absent from the allowlist.",
     expected: "Deny",
+    expect: {
+      policyDecision: "deny",
+      status: "denied",
+      riskLevel: "critical",
+      approvalRole: null,
+      denyCode: "unregistered_tool",
+    },
     request: {
       actorId: "agent-unknown-08",
       actorType: "ai-agent",
@@ -254,6 +326,13 @@ export const SCENARIOS = Object.freeze([
     description:
       "An agent asks for a production privilege grant but skips stating its options, recommendation, or confidence before asking a human to decide.",
     expected: "Decision-package gate rejects it before a human sees it",
+    expect: {
+      policyDecision: "require_human",
+      status: "gate_rejected",
+      riskLevel: "critical",
+      approvalRole: "security-lead",
+      denyCode: null,
+    },
     request: {
       actorId: "agent-handoff-09",
       actorType: "ai-agent",
