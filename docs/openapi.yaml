@@ -98,14 +98,61 @@ paths:
                 actorId:
                   type: string
                   description: Requester the caller claims to be. Must match the request.
+                idempotencyKey:
+                  type: string
+                  pattern: "^[A-Za-z0-9._:-]{8,128}$"
+                  description: >
+                    Caller-chosen key. Repeating the call with the same key returns the
+                    recorded outcome (`replayed: true`) and never dispatches again.
+                executionId:
+                  type: string
+                  description: Alternative to the key when retrying a call that already reserved.
               additionalProperties: false
       responses:
         "200":
-          description: Synthetic execution receipt
+          description: Execution record. `execution.state` is executing, executed or failed.
         "404":
           description: Request not found
         "409":
           description: One of not_authorized, authorization_expired, replay_blocked, binding_mismatch, actor_mismatch, integrity_failed or version_conflict
+  /api/requests/{requestId}/reserve:
+    post:
+      operationId: reserveExecution
+      description: Phase one only. Consumes the grant and returns an executionId and a dispatch key. Same body as execute.
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: Reservation, state executing
+        "409":
+          description: Same refusal codes as execute
+  /api/executions/{executionId}:
+    get:
+      operationId: getExecution
+      description: State (executing, executed, failed, unknown_outcome) and result digest. A reservation older than the timeout is settled to unknown_outcome on read.
+      responses:
+        "200":
+          description: Execution record
+        "404":
+          description: Not found
+  /api/executions/{executionId}/confirm:
+    post:
+      operationId: confirmExecution
+      description: Phase three. Needs the dispatch key. Records executed (with a result digest) or failed. Trusted in demo mode.
+      responses:
+        "200":
+          description: Updated execution record
+        "409":
+          description: confirm_rejected, invalid_state or needs_reconciliation
+  /api/executions/{executionId}/reconcile:
+    post:
+      operationId: reconcileExecution
+      description: A reviewer records what really happened to an unknown_outcome execution, with a reason. Audited. The requester cannot reconcile their own call.
+      responses:
+        "200":
+          description: Updated execution record
+        "409":
+          description: invalid_state, self_reconcile or insufficient_role
   /api/audit:
     get:
       operationId: listAuditEvents

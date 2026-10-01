@@ -176,8 +176,45 @@ stateDiagram-v2
     Approved --> Executed: valid single-use execution
     AutoApproved --> Expired: TTL elapsed
     Approved --> Expired: TTL elapsed
-    Executed --> Executed: replay blocked
+    AutoApproved --> Executing: reserve (grant consumed)
+    Approved --> Executing: reserve (grant consumed)
+    Executing --> Executed: confirm
+    Executing --> Failed: confirm
+    Executing --> UnknownOutcome: no confirm within 5 minutes
+    UnknownOutcome --> Executed: reconcile by a person
+    UnknownOutcome --> Failed: reconcile by a person
+    Executed --> Executed: replay blocked, or same key returns stored result
 ```
+
+## Two-phase execution
+
+The one-call `execute` is three steps in a row.
+
+1. **Reserve.** One compare-and-swap checks the status, expiry, request hash,
+   actor and stored-record integrity, consumes the grant and writes state
+   `executing` with an `executionId` and the caller's idempotency key. The
+   gateway derives a dispatch key from the execution id and a per-service
+   secret. The audit event is `action.reserved` and carries only a digest of
+   the dispatch key.
+2. **Dispatch.** The tool is called with the dispatch key. The synthetic tools
+   keep a record of keys (`server/downstream.js`) and a repeated key returns
+   the first result without doing the work again.
+3. **Confirm.** The outcome is stored as `executed` (with a SHA-256 digest of the
+   result) or `failed`, audited as `action.confirmed` or `action.failed`.
+
+A caller that lost the response asks again with the same approval and the
+same key (or the execution id). The gateway answers from the record
+(`action.retry_served`) and does not reach the tool. A different key, or a
+changed request hash, is refused with `replay_blocked` or `binding_mismatch`.
+Retrieval is `GET /api/executions/:id`, the MCP tool `get_execution_result`
+and the review UI.
+
+If no confirm arrives within five minutes the record becomes
+`unknown_outcome` (`action.unknown_outcome`). Nothing re-dispatches it. A
+real tool that timed out gives the gateway no way to know whether it ran, and
+guessing either way is worse than asking. A reviewer who is not the requester
+records the real outcome with a reason through `reconcile`
+(`action.reconciled`).
 
 ## Data model
 
@@ -204,6 +241,13 @@ both copies.
 
 ## Limits and honest caveats
 
+- What two-phase execution does not solve: exactly-once needs the downstream
+  system to honour the key, and the lab tools are synthetic. The gateway can
+  promise it will not dispatch twice for one grant. It cannot make a tool that
+  ignores the key safe to retry. The confirm call is trusted in demo mode.
+  Anything that can call it with the dispatch key can record an outcome, so a
+  real deployment authenticates the executor. The fake downstream and its
+  record of keys live in memory and reset on restart.
 - Data is synthetic and the executor is simulated.
 - Reviewer identity and role are supplied by the caller.
 - The analyst is rule-based unless a model is configured.

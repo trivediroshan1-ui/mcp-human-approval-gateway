@@ -2266,3 +2266,25 @@ button:disabled {
     justify-self: start;
   }
 }
+
+.executed-callout.exec-unknown_outcome,
+.executed-callout.exec-failed {
+  background: rgba(255, 190, 90, 0.07);
+  border-color: rgba(255, 190, 90, 0.3);
+}
+.exec-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+.exec-actions small,
+.executed-callout span {
+  overflow-wrap: anywhere;
+}
+.lab-strip select {
+  max-width: 100%;
+}
+.reconcile-form { display: grid; grid-template-columns: 1fr; width: 100%; }
+.reconcile-form label { display: grid; gap: 0.25rem; font-size: 0.7rem; color: var(--muted); }
+.reconcile-form textarea, .reconcile-form select { width: 100%; box-sizing: border-box; }

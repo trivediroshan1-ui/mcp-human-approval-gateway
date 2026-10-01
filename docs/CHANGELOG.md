@@ -1,5 +1,18 @@
 # Changelog
 
+## Lost-response handling
+
+- Execution is now reserve, dispatch, confirm. The one-call `execute` composes
+  them. The same approval with the same idempotency key returns the stored
+  result and never dispatches twice. A different key or changed hash is refused.
+- New states `executing`, `failed` and `unknown_outcome`. A stuck execution
+  becomes `unknown_outcome` after five minutes and is settled only by a person
+  through `reconcile`. No automatic retry.
+- `GET /api/executions/:id`, `confirm`, `reconcile`, the MCP tool
+  `get_execution_result` and `_meta.replayed` on repeated MCP calls.
+- A fake downstream with key records and fault injection backs the tests and the
+  demo. Review UI has retry buttons and a reconcile panel.
+
 ## MCP server and site integration
 
 - Added a Model Context Protocol server (revision 2026-07-28, plus 2025-11-25)

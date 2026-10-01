@@ -120,7 +120,7 @@ curl -s http://127.0.0.1:4174/mcp \
 ## Tools
 
 `tools/list` returns the seven registered tools in registry order, then
-`check_approval_status`. The order is stable. The list carries `ttlMs` and
+`check_approval_status` and `get_execution_result`. The order is stable. The list carries `ttlMs` and
 `cacheScope` as the revision requires.
 
 | Tool | Actions | Annotations |
@@ -147,6 +147,26 @@ privilege-changing or production-changing, which is the cautious reading.
 The client cannot send an `actorId`. The requester is always the configured
 `MCP_AGENT_ID`, so a client cannot approve, replay or look up requests as
 someone else.
+
+## Lost responses and idempotency keys
+
+Every tool accepts an optional `idempotencyKey` (8 to 128 characters from
+`A-Za-z0-9._:-`). Repeat a call that already executed with the same approval
+and the same key and the server returns the stored result with
+`isError: false` and `_meta.replayed: true`. The text starts with "REPEATED
+CALL, NOTHING RAN AGAIN." A new key gets the existing `replay_blocked`
+refusal. Without an `approvalId`, a keyed call is matched to an earlier request
+from the same agent with that key (latest 250 requests).
+
+`get_execution_result` takes an `executionId` and returns the state
+(`executing`, `executed`, `failed`, `unknown_outcome`) and the result digest.
+Executions that stay `executing` past five minutes become `unknown_outcome` and
+need a person to reconcile them through the REST API or the UI. Both protocol
+revisions behave the same way.
+
+What this does not solve: exactly-once needs the downstream to honour the key.
+The lab tools are synthetic. The confirm call is trusted in demo mode and
+needs authentication in a real deployment.
 
 ## How a call flows
 
