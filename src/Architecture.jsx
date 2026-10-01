@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EDGES, NODES, STEPS, planRequest, planScenario } from "./architecture-model.js";
+import { EDGES, EXTRA_PATHS, NODES, STEPS, planExtra, planRequest, planScenario } from "./architecture-model.js";
 
 // Two separate layouts. The wide one is a two-row snake with the audit chain
 // between the rows. The narrow one is a single tall column, so the text stays
@@ -34,7 +34,9 @@ const WIDE = {
     e7: { pts: [[1028, 360], [766, 360]], badge: [897, 360], label: [897, 345] },
     e8: { pts: [[620, 360], [562, 360]], badge: [591, 360], label: [591, 345] },
     e9: { pts: [[416, 360], [358, 360]], badge: [387, 360], label: [387, 345] },
-    e10: { pts: [[212, 360], [154, 360]], badge: [183, 360], label: [183, 345] },
+    e10: { pts: [[212, 346], [154, 346]], badge: [183, 346], label: [183, 331] },
+    e11: { pts: [[154, 378], [212, 378]], badge: [183, 378], label: [183, 394] },
+    e12: { pts: [[81, 322], [81, 296], [693, 296], [693, 322]], badge: [387, 296], label: [387, 316] },
   },
   band: {
     label: { x: 8, y: 228, w: 124, h: 48 },
@@ -53,6 +55,8 @@ const WIDE = {
     { node: "reviewer", pts: [[650, 322], [650, 276]] },
     { node: "guard", pts: [[242, 322], [242, 276]] },
   ],
+  counter: { x: 8, y: 401, w: 88, h: 17 },
+  pills: { agent: [8, 190], guard: [212, 400], tool: [100, 401] },
 };
 
 const NARROW = {
@@ -84,7 +88,9 @@ const NARROW = {
     e7: { pts: [[129, 504], [129, 538]], badge: [129, 521], label: [145, 525], anchor: "start" },
     e8: { pts: [[129, 590], [129, 624]], badge: [129, 607], label: [145, 611], anchor: "start" },
     e9: { pts: [[129, 676], [129, 710]], badge: [129, 693], label: [145, 697], anchor: "start" },
-    e10: { pts: [[129, 762], [129, 796]], badge: [129, 779], label: [145, 783], anchor: "start" },
+    e10: { pts: [[70, 762], [70, 796]], badge: [70, 779], label: [86, 783], anchor: "start" },
+    e11: { pts: [[190, 796], [190, 762]], badge: [190, 779], label: [206, 783], anchor: "start" },
+    e12: { pts: [[224, 836], [304, 836], [304, 552], [224, 552]], badge: [304, 690], label: [292, 760], rotate: true },
   },
   band: {
     label: { x: 34, y: 868, w: 300, h: 0 },
@@ -98,6 +104,8 @@ const NARROW = {
     { node: "guard", pts: [[224, 756], [352, 756]] },
   ],
   spine: [[352, 142], [352, 900], [334, 900]],
+  counter: { x: 232, y: 800, w: 66, h: 18 },
+  pills: { agent: [34, 66], guard: [34, 766], tool: [34, 852] },
 };
 
 const SLOT_LABELS = ["request.submitted", "policy.*", "ai.analysis", "human / gate", "executed"];
@@ -121,7 +129,7 @@ function useMedia(query) {
 }
 
 function stepOfTick(tick) {
-  return tick.audit ? 11 : EDGES[tick.edge].step;
+  return tick.step ?? (tick.audit ? STEPS.length : EDGES[tick.edge].step);
 }
 
 export default function Architecture({ scenarios, selectedRequest }) {
@@ -136,12 +144,14 @@ export default function Architecture({ scenarios, selectedRequest }) {
   const followable = Boolean(selectedRequest);
   const effective = choice === "follow" && !followable ? scenarios[0]?.id ?? "" : choice;
   const scenario = scenarios.find((item) => item.id === effective) ?? null;
+  const extra = EXTRA_PATHS.find((item) => item.id === effective) ?? null;
 
   const route = useMemo(() => {
     if (effective === "follow" && selectedRequest) return planRequest(selectedRequest);
+    if (extra) return planExtra(effective, scenarios);
     if (scenario) return planScenario(scenario);
     return null;
-  }, [effective, selectedRequest, scenario]);
+  }, [effective, selectedRequest, scenario, extra, scenarios]);
 
   const routeKey = route ? `${effective}|${route.stop}|${route.tone}|${route.ticks.length}|${route.edges.join(",")}` : "none";
   useEffect(() => {
@@ -209,9 +219,14 @@ export default function Architecture({ scenarios, selectedRequest }) {
     ? currentTick.reverse
       ? EDGES[currentTick.edge].from
       : EDGES[currentTick.edge].to
-    : tick > 0
-      ? route.stop
-      : "agent";
+    : currentTick?.hold
+      ? currentTick.node
+      : tick > 0
+        ? route.stop
+        : "agent";
+  const dispatches = route.ticks.slice(0, tick).filter((t) => t.edge === "e10").length;
+  const pill = currentTick?.pill ?? null;
+  const pillNode = currentTick?.pill ? (currentTick.edge === "e1" ? "agent" : currentTick.node) : null;
   const finished = tick >= total;
   const activeStep = currentTick ? stepOfTick(currentTick) : 1;
   const stepsOnRoute = new Set(route.ticks.map(stepOfTick));
@@ -241,7 +256,7 @@ export default function Architecture({ scenarios, selectedRequest }) {
     return classes.join(" ");
   }
 
-  const scenarioLabel = effective === "follow" ? "the selected request" : scenario?.title;
+  const scenarioLabel = effective === "follow" ? "the selected request" : scenario?.title ?? extra?.title;
   const toneWord = { ok: "Reaches the tool", blocked: "Stops", waiting: "Waiting" }[route.tone];
   const stopLabel = NODES[route.stop].title;
 
@@ -252,7 +267,7 @@ export default function Architecture({ scenarios, selectedRequest }) {
           <p className="section-label">How a request is controlled</p>
           <h2 id="arch-title">Architecture and workflow</h2>
         </div>
-        <span>{total ? `Step ${Math.max(1, activeStep)} of 11` : ""}</span>
+        <span>{total ? `Step ${Math.max(1, activeStep)} of ${STEPS.length}` : ""}</span>
       </div>
 
       <div className="arch-body">
@@ -271,6 +286,11 @@ export default function Architecture({ scenarios, selectedRequest }) {
                 </option>
               )}
               {scenarios.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                </option>
+              ))}
+              {EXTRA_PATHS.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.title}
                 </option>
@@ -301,8 +321,8 @@ export default function Architecture({ scenarios, selectedRequest }) {
 
         <div className={`arch-outcome tone-${route.tone}`} role="status">
           <strong>
-            {toneWord}
-            {route.tone !== "ok" ? ` at ${stopLabel.toLowerCase()}` : ""}
+            {route.headline ?? toneWord}
+            {!route.headline && route.tone !== "ok" ? ` at ${stopLabel.toLowerCase()}` : ""}
           </strong>
           <span>
             {scenarioLabel}: {route.summary}
@@ -426,6 +446,23 @@ export default function Architecture({ scenarios, selectedRequest }) {
               );
             })}
 
+            {/* dispatch counter on the tool node */}
+            <g className={`arch-counter ${dispatches > 0 ? "on" : ""}`} data-testid="dispatch-counter">
+              <rect {...layout.counter} rx="9" />
+              <text x={layout.counter.x + layout.counter.w / 2} y={layout.counter.y + layout.counter.h / 2 + 4} textAnchor="middle">
+                {dispatches} {dispatches === 1 ? "dispatch" : "dispatches"}
+              </text>
+            </g>
+
+            {pill && pillNode && layout.pills[pillNode] && (
+              <g className="arch-pill">
+                <rect x={layout.pills[pillNode][0]} y={layout.pills[pillNode][1]} width="92" height="18" rx="9" />
+                <text x={layout.pills[pillNode][0] + 46} y={layout.pills[pillNode][1] + 13} textAnchor="middle">
+                  {pill}
+                </text>
+              </g>
+            )}
+
             {/* the token */}
             <g className="arch-token" aria-hidden="true">
               <circle className="arch-token-halo" r="15" />
@@ -449,6 +486,7 @@ export default function Architecture({ scenarios, selectedRequest }) {
             Step {Math.max(1, activeStep)}: {STEPS[Math.max(1, activeStep) - 1].title}
           </strong>
           <p>{STEPS[Math.max(1, activeStep) - 1].text}</p>
+          {currentTick?.note && <p className="arch-note">{currentTick.note}</p>}
           <p className="guardrail">
             <span>Guardrail</span> {STEPS[Math.max(1, activeStep) - 1].guardrail}
           </p>

@@ -123,6 +123,8 @@ a person. The lab shows the human the context as quoted, untrusted data.
    system and records what happened, with a reason. The gateway never retries
    it on its own.
 
+The architecture view animates this as its "Lost response" path, and the "No confirm" path for step 4.
+
 In the browser demo, pick "Runs, but the answer is lost" in the lab strip,
 execute, then use the retry buttons and the lab clock.
 

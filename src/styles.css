@@ -2288,3 +2288,34 @@ button:disabled {
 .reconcile-form { display: grid; grid-template-columns: 1fr; width: 100%; }
 .reconcile-form label { display: grid; gap: 0.25rem; font-size: 0.7rem; color: var(--muted); }
 .reconcile-form textarea, .reconcile-form select { width: 100%; box-sizing: border-box; }
+
+.arch-counter rect {
+  fill: var(--surface-2);
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+}
+.arch-counter text {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.arch-counter.on rect {
+  fill: rgba(98, 230, 167, 0.14);
+  stroke: var(--green);
+}
+.arch-counter.on text {
+  fill: var(--green);
+}
+.arch-pill rect {
+  fill: rgba(255, 190, 90, 0.16);
+  stroke: rgba(255, 190, 90, 0.7);
+}
+.arch-pill text {
+  fill: var(--text);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.arch-note {
+  color: var(--text);
+  font-weight: 600;
+}
