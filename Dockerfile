@@ -19,6 +19,7 @@ RUN mkdir -p /app/data && chown -R node:node /app
 USER node
 
 ENV PORT=4174
+ENV HOST=0.0.0.0
 ENV DATABASE_PATH=./data/gateway.db
 EXPOSE 4174
 

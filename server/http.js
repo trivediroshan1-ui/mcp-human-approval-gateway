@@ -165,6 +165,7 @@ export function createHttpHandler({
   toolRegistry,
   clientDir,
   allowReset = true,
+  mcpHandler = null,
   log = (message) => console.error(message),
 }) {
   const allowWrite = createRateLimiter({});
@@ -173,6 +174,11 @@ export function createHttpHandler({
     const url = new URL(request.url, "http://gateway.local");
     const method = request.method ?? "GET";
     try {
+      // The MCP endpoint does its own Origin, Host, size and type checks.
+      if (mcpHandler && url.pathname === "/mcp") {
+        await mcpHandler(request, response);
+        return;
+      }
       if (url.pathname.startsWith("/api/") && method !== "GET" && isCrossOrigin(request)) {
         sendJson(response, 403, {
           error: "cross_origin_blocked",
