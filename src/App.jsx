@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 // When VITE_STATIC_DEMO=true (GitHub Pages build), all /api calls are handled
 // by the in-browser demo service — no server, no credentials, no real data.
 import { demoApiAdapter } from "./demo/client.js";
+import Architecture from "./Architecture.jsx";
 const IS_DEMO = import.meta.env.VITE_STATIC_DEMO === "true";
 
 const REVIEWERS = [
   { id: "owner-aria", role: "resource-owner", label: "Aria · Resource owner" },
   { id: "analyst-dev", role: "security-analyst", label: "Dev · Security analyst" },
   { id: "lead-morgan", role: "security-lead", label: "Morgan · Security lead" },
+  { id: "viewer-sam", role: "viewer", label: "Sam · Viewer (cannot decide)" },
+  { id: "__requester__", role: "security-lead", label: "The requesting agent (self-approval test)" },
 ];
 
 const STATUS_COPY = {
@@ -44,6 +47,11 @@ async function api(path, options) {
   return payload;
 }
 
+function errorText(error) {
+  const code = error?.payload?.code;
+  return code ? `${error.message} (${code})` : error.message;
+}
+
 function riskTone(level) {
   return ["critical", "high", "medium", "low"].includes(level) ? level : "neutral";
 }
@@ -56,6 +64,14 @@ function formatTime(value) {
     second: "2-digit",
   }).format(new Date(value));
 }
+
+const CHAIN_REASON = {
+  hash_mismatch: "an event was edited",
+  link_broken: "a link between events is broken",
+  sequence_gap: "an event is missing or out of order",
+  signature_invalid: "a signature does not match",
+  anchor_mismatch: "the saved anchor does not match",
+};
 
 function formatCountdown(expiresAt, now) {
   if (!expiresAt) return null;
@@ -87,7 +103,8 @@ function DemoBanner() {
   );
 }
 
-function Header({ auditValid, onReset }) {
+function Header({ verification, onReset }) {
+  const auditValid = verification.valid;
   return (
     <header className="topbar">
       <a className="brand" href="#decision-desk" aria-label="MCP Gateway decision desk">
@@ -101,9 +118,16 @@ function Header({ auditValid, onReset }) {
         <span className="live-dot" aria-hidden="true" />
         {IS_DEMO ? "Browser demo" : "Synthetic research mode"}
       </div>
+      <nav className="top-nav" aria-label="Sections">
+        <a href="#decision-desk">Lab</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#limits">Limits</a>
+      </nav>
       <div className="header-actions">
         <span className={`chain-state ${auditValid ? "valid" : "invalid"}`}>
-          Audit chain {auditValid ? "verified" : "failed"}
+          {auditValid
+            ? "Audit chain verified"
+            : `Audit chain failed at event ${verification.failedSequence ?? "?"}`}
         </span>
         <button className="quiet-button" type="button" onClick={onReset}>
           Reset lab
@@ -124,6 +148,10 @@ function Hero({ metrics }) {
         <p className="hero-copy">
           A public-safe lab for evaluating MCP tool requests against deterministic
           policy, time-bound human approval and a verifiable decision record.
+        </p>
+        <p className="hero-links">
+          <a href="#architecture">Watch the animated workflow</a>
+          <a href="#limits">What this lab does not prove</a>
         </p>
       </div>
       <div className="hero-flow" aria-label="Gateway decision path">
@@ -162,7 +190,7 @@ function Hero({ metrics }) {
   );
 }
 
-function ScenarioCatalog({ scenarios, busy, onLaunch }) {
+function ScenarioCatalog({ scenarios, busy, onLaunch, checks }) {
   return (
     <section className="panel scenario-panel" aria-labelledby="scenario-title">
       <div className="panel-heading">
@@ -180,6 +208,13 @@ function ScenarioCatalog({ scenarios, busy, onLaunch }) {
               <h3>{scenario.title}</h3>
               <p>{scenario.description}</p>
               <span className="expected">Expected · {scenario.expected}</span>
+              {checks[scenario.id] && (
+                <span className={`check-line ${checks[scenario.id].ok ? "ok" : "bad"}`}>
+                  {checks[scenario.id].ok
+                    ? "Last run matched the expected outcome"
+                    : `Last run differed: ${checks[scenario.id].detail}`}
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -250,6 +285,9 @@ function DecisionPanel({
   busy,
   onDecide,
   onExecute,
+  onReplay,
+  onAdvance,
+  clockOffset,
 }) {
   const [now, setNow] = useState(Date.now());
 
@@ -257,6 +295,7 @@ function DecisionPanel({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  const labNow = now + (clockOffset ?? 0);
 
   if (!request) {
     return (
@@ -273,7 +312,7 @@ function DecisionPanel({
   const canDecide = request.status === "pending_human";
   const canExecute = ["approved", "auto_approved"].includes(request.status);
   const countdownLabel = canExecute
-    ? formatCountdown(request.authorizationExpiresAt, now)
+    ? formatCountdown(request.authorizationExpiresAt, labNow)
     : null;
   const isExpired = countdownLabel === "Expired";
 
@@ -312,7 +351,26 @@ function DecisionPanel({
           <span>Resource</span>
           <strong>{request.resource}</strong>
         </div>
+        <div className="fact-wide">
+          <span>Request hash (the approval is bound to this)</span>
+          <strong className="mono" title={request.requestHash}>
+            {request.requestHash ? `${request.requestHash.slice(0, 24)}…` : "—"}
+          </strong>
+        </div>
       </div>
+
+      {(request.context || (request.arguments && Object.keys(request.arguments).length > 0)) && (
+        <div className="untrusted-card">
+          <div className="card-label">
+            Untrusted input from the agent
+            <span>Data, never instructions</span>
+          </div>
+          {request.context && <blockquote>{request.context}</blockquote>}
+          {request.arguments && Object.keys(request.arguments).length > 0 && (
+            <pre>{JSON.stringify(request.arguments, null, 2)}</pre>
+          )}
+        </div>
+      )}
 
       <div className="decision-columns">
         <div className="evidence-card">
@@ -339,6 +397,11 @@ function DecisionPanel({
             AI analysis
             <span>Advisory only</span>
           </div>
+          <p className={`analyst-kind ${request.aiAnalysis?.modelCalled ? "model" : "sim"}`}>
+            {request.aiAnalysis?.modelCalled
+              ? `Model output (${request.aiAnalysis.provider}). It cannot change the decision.`
+              : "Simulated analyst: fixed rules wrote this text. No language model was called."}
+          </p>
           <p className="ai-summary">{request.aiAnalysis?.summary}</p>
           {request.aiAnalysis?.decisionPackage?.complete === false ? (
             <p className="ai-summary" style={{ color: "var(--red)" }}>
@@ -458,12 +521,29 @@ function DecisionPanel({
         </div>
       )}
 
+      {IS_DEMO && canExecute && (
+        <div className="lab-strip">
+          <span>Lab clock</span>
+          <p>Authorizations expire on the clock. Move it forward to watch the guard refuse an old one.</p>
+          <div>
+            {[11, 31, 61].map((minutes) => (
+              <button key={minutes} type="button" disabled={busy} onClick={() => onAdvance(minutes)}>
+                +{minutes} min
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {request.status === "executed" && (
         <div className="executed-callout">
           <strong>Execution consumed</strong>
           <span>
             Replay protection active · execution {shortId(request.executionId)}
           </span>
+          <button type="button" disabled={busy} onClick={onReplay}>
+            Try to replay it
+          </button>
         </div>
       )}
 
@@ -481,7 +561,7 @@ function DecisionPanel({
   );
 }
 
-function AuditTrail({ events, verification }) {
+function AuditTrail({ events, verification, onTamper, busy }) {
   return (
     <section className="panel audit-panel" aria-labelledby="audit-title">
       <div className="panel-heading">
@@ -489,14 +569,35 @@ function AuditTrail({ events, verification }) {
           <p className="section-label">Hash-chained evidence</p>
           <h2 id="audit-title">Decision record</h2>
         </div>
-        <span>{verification.checkedEvents ?? 0} events verified</span>
+        <span>
+          {verification.valid
+            ? `${verification.checkedEvents ?? 0} events verified`
+            : `Broken at event ${verification.failedSequence}`}
+        </span>
       </div>
+      <p className={`chain-line ${verification.valid ? "valid" : "invalid"}`} role="status">
+        {verification.valid ? (
+          <>
+            Head <code>{(verification.headHash ?? "").slice(0, 16)}</code> at event{" "}
+            {verification.headSequence ?? 0} ·{" "}
+            {verification.signed ? "HMAC-signed" : "unsigned (no key configured)"}
+          </>
+        ) : (
+          <>
+            Verification failed: {CHAIN_REASON[verification.reason] ?? "the chain does not verify"} at
+            event {verification.failedSequence}. Reset the lab to start a clean chain.
+          </>
+        )}
+      </p>
       <div className="audit-list">
         {events.length === 0 ? (
           <p>No audit events.</p>
         ) : (
           events.slice(0, 18).map((event) => (
-            <article key={event.eventId}>
+            <article
+              key={event.eventId}
+              className={!verification.valid && event.sequence === verification.failedSequence ? "broken" : ""}
+            >
               <span className="audit-sequence">{String(event.sequence).padStart(3, "0")}</span>
               <div>
                 <strong>{event.eventType}</strong>
@@ -508,10 +609,55 @@ function AuditTrail({ events, verification }) {
           ))
         )}
       </div>
+      {IS_DEMO && (
+        <div className="lab-strip">
+          <span>Tamper test</span>
+          <p>
+            Edit one stored event without recomputing any hash, the way a careless attacker would.
+            Verification should fail at exactly that event.
+          </p>
+          <div>
+            <button type="button" disabled={busy || events.length === 0} onClick={onTamper}>
+              Edit a stored event
+            </button>
+          </div>
+        </div>
+      )}
       <p className="audit-note">
-        The SHA-256 chain makes accidental or unsophisticated modification detectable. It
-        is not a substitute for externally anchored, append-only production logging.
+        Each event hash covers the one before it, so edits, gaps and reordering are detected. A
+        plain hash chain does not stop someone who can write the store and rebuild every hash. That
+        needs a signing key or a head hash saved somewhere the writer cannot reach. The browser demo
+        has neither, so treat it as an illustration.
       </p>
+    </section>
+  );
+}
+
+function Limits() {
+  const items = [
+    ["Synthetic data only", "Every tool, resource, identity and action here is made up. Nothing connects to a real system."],
+    ["Simulated reviewers", "Reviewers are picked from a list and their role is whatever the list says. There is no login. A real deployment needs authenticated people and roles from a governed source."],
+    ["Simulated analyst", "Unless a server is configured with a model, the AI analyst is a fixed set of rules that rewords the policy result. No model runs and nothing is learned from the request."],
+    ["Heuristic injection check", "The phrase scan catches obvious attempts and common disguises. A paraphrase, another language or an encoded payload gets past it. The real protection is that context is treated as data, policy never reads it for permission, and anything sensitive still goes to a person."],
+    ["Tamper-evident, not tamper-proof", "The hash chain exposes edits, gaps and reordering. A writer who can rebuild every hash is not stopped unless events are signed with a key they lack or the head hash is saved elsewhere. The browser demo has neither."],
+    ["Not a production control", "State in the browser demo lives in localStorage and anyone can change it. The enforcement point here is code you are reading, not a boundary in front of a real tool."],
+  ];
+  return (
+    <section className="panel limits-panel" id="limits" aria-labelledby="limits-title">
+      <div className="panel-heading">
+        <div>
+          <p className="section-label">Read this before trusting any of it</p>
+          <h2 id="limits-title">Limits and honest caveats</h2>
+        </div>
+      </div>
+      <dl className="limits-list">
+        {items.map(([term, text]) => (
+          <div key={term}>
+            <dt>{term}</dt>
+            <dd>{text}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
@@ -529,6 +675,8 @@ function App() {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [clockOffset, setClockOffset] = useState(0);
+  const [checks, setChecks] = useState({});
 
   const selected = requests.find((request) => request.id === selectedId) ?? null;
 
@@ -551,6 +699,10 @@ function App() {
     setRequests(requestPayload.requests);
     setEvents(auditPayload.events);
     setVerification(verifyPayload);
+    if (IS_DEMO) {
+      const lab = await api("/api/lab");
+      setClockOffset(lab.clockOffsetMs);
+    }
     setSelectedId((current) => {
       const desired = preferredId ?? current;
       if (desired && requestPayload.requests.some((request) => request.id === desired)) {
@@ -581,22 +733,46 @@ function App() {
       const result = await action();
       await refresh(result?.request?.id ?? selectedId);
       setReason("");
-      setNotice({ type: "success", message: successMessage });
+      const message = typeof successMessage === "function" ? successMessage(result) : successMessage;
+      setNotice(
+        typeof message === "string" ? { type: "success", message } : message,
+      );
     } catch (error) {
-      setNotice({ type: "error", message: error.message });
+      setNotice({ type: "error", message: errorText(error) });
     } finally {
       setBusy(false);
     }
   }
 
   function launchScenario(scenarioId) {
+    const scenario = scenarios.find((item) => item.id === scenarioId);
     return perform(
       () =>
         api("/api/requests", {
           method: "POST",
           body: JSON.stringify({ scenarioId }),
         }),
-      "Scenario evaluated. Policy and AI evidence are ready.",
+      (result) => {
+        const want = scenario?.expect;
+        const got = result.request;
+        const misses = want
+          ? Object.keys(want)
+              .filter((key) => key !== "denyCode")
+              .filter((key) => got[key] !== want[key])
+              .map((key) => `${key} was ${got[key]}, expected ${want[key]}`)
+          : [];
+        const ok = misses.length === 0;
+        setChecks((current) => ({
+          ...current,
+          [scenarioId]: { ok, detail: misses.join("; ") },
+        }));
+        return ok
+          ? `${scenario?.title ?? "Scenario"}: matches the expected outcome (${scenario?.expected}).`
+          : {
+              type: "error",
+              message: `${scenario?.title ?? "Scenario"} differs from the expected outcome: ${misses.join("; ")}.`,
+            };
+      },
     );
   }
 
@@ -606,7 +782,7 @@ function App() {
         api(`/api/requests/${selectedId}/decision`, {
           method: "POST",
           body: JSON.stringify({
-            reviewerId: reviewer.id,
+            reviewerId: reviewer.id === "__requester__" ? selected.actorId : reviewer.id,
             reviewerRole: reviewer.role,
             decision,
             reason,
@@ -623,9 +799,52 @@ function App() {
       () =>
         api(`/api/requests/${selectedId}/execute`, {
           method: "POST",
-          body: JSON.stringify({}),
+          body: JSON.stringify({
+            requestHash: selected.requestHash,
+            actorId: selected.actorId,
+          }),
         }),
       "Synthetic action executed through the guard.",
+    );
+  }
+
+  async function replay() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await api(`/api/requests/${selectedId}/execute`, {
+        method: "POST",
+        body: JSON.stringify({ requestHash: selected.requestHash, actorId: selected.actorId }),
+      });
+      setNotice({ type: "error", message: "The replay was not blocked. That would be a bug." });
+    } catch (error) {
+      const blocked = error.payload?.code === "replay_blocked";
+      setNotice({
+        type: blocked ? "success" : "error",
+        message: blocked
+          ? `Replay blocked as expected: ${error.message}`
+          : `Unexpected result: ${errorText(error)}`,
+      });
+    }
+    try {
+      await refresh(selectedId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function advanceClock(minutes) {
+    return perform(
+      () => api("/api/lab/advance-clock", { method: "POST", body: JSON.stringify({ minutes }) }),
+      `Lab clock moved forward ${minutes} minutes. Authorizations older than their window are now expired.`,
+    );
+  }
+
+  function tamper() {
+    return perform(
+      () => api("/api/lab/tamper", { method: "POST", body: JSON.stringify({}) }),
+      (result) =>
+        `Stored event ${result.sequence} was edited without recomputing hashes. Verification should now fail there.`,
     );
   }
 
@@ -636,14 +855,17 @@ function App() {
           method: "POST",
           body: JSON.stringify({}),
         }),
-      "Synthetic lab reset.",
+      () => {
+        setChecks({});
+        return "Synthetic lab reset.";
+      },
     );
   }
 
   return (
     <>
       <DemoBanner />
-      <Header auditValid={verification.valid} onReset={reset} />
+      <Header verification={verification} onReset={reset} />
       <main id="main-content">
         <Hero metrics={metrics} />
         {notice && (
@@ -652,7 +874,7 @@ function App() {
           </div>
         )}
         <div className="workspace" id="decision-desk">
-          <ScenarioCatalog scenarios={scenarios} busy={busy} onLaunch={launchScenario} />
+          <ScenarioCatalog scenarios={scenarios} busy={busy} onLaunch={launchScenario} checks={checks} />
           <RequestQueue
             requests={requests}
             selectedId={selectedId}
@@ -670,9 +892,14 @@ function App() {
             busy={busy}
             onDecide={decide}
             onExecute={execute}
+            onReplay={replay}
+            onAdvance={advanceClock}
+            clockOffset={clockOffset}
           />
-          <AuditTrail events={events} verification={verification} />
+          <AuditTrail events={events} verification={verification} onTamper={tamper} busy={busy} />
         </div>
+        <Architecture scenarios={scenarios} selectedRequest={selected} />
+        <Limits />
       </main>
       <footer>
         <div>
