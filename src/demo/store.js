@@ -146,6 +146,14 @@ export function createStore() {
       return r ? structuredClone(r) : null;
     },
 
+    findByExecutionId(executionId) {
+      if (typeof executionId !== "string" || !executionId) return null;
+      for (const request of requests.values()) {
+        if (request.executionId === executionId) return structuredClone(request);
+      }
+      return null;
+    },
+
     listRequests(limit = 100) {
       const safeLimit = Math.max(1, Math.min(250, Number(limit) || 100));
       return [...requests.values()]
@@ -163,7 +171,7 @@ export function createStore() {
       if (!current) return { ok: false, reason: "not_found" };
       if (current.version !== expectedVersion) return { ok: false, reason: "version_conflict" };
 
-      const allowed = ["status", "authorizationExpiresAt", "executionId", "executedAt", "updatedAt"];
+      const allowed = ["status", "authorizationExpiresAt", "executionId", "executedAt", "execution", "updatedAt"];
       const patch = {};
       for (const key of allowed) {
         if (Object.hasOwn(changes, key)) patch[key] = changes[key];

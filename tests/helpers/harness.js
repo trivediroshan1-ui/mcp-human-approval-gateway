@@ -24,14 +24,14 @@ function clockFixture(initial = START) {
 export function serverHarness(options = {}) {
   const time = clockFixture();
   const store = createServerStore(options.path ?? ":memory:", options.storeOptions);
-  const service = createServerService({ store, clock: time.clock, analyzer: options.analyzer });
+  const service = createServerService({ store, clock: time.clock, analyzer: options.analyzer, downstream: options.downstream });
   return { name: "server", store, service, time, close: () => store.close() };
 }
 
 export function demoHarness(options = {}) {
   const time = clockFixture();
   const store = createDemoStore();
-  const service = createDemoService({ store, clock: time.clock, analyzer: options.analyzer });
+  const service = createDemoService({ store, clock: time.clock, analyzer: options.analyzer, downstream: options.downstream });
   return { name: "demo", store, service, time, close: () => store.close() };
 }
 
@@ -143,6 +143,7 @@ export function auditShape(events, extraStrip = []) {
     .map((event) => {
       const payload = { ...event.payload };
       delete payload.executionId;
+      delete payload.dispatchKeyDigest;
       for (const key of extraStrip) delete payload[key];
       return { sequence: event.sequence, eventType: event.eventType, actor: event.actor, payload };
     });

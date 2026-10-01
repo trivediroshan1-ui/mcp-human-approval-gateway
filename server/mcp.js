@@ -31,6 +31,7 @@ export const ERR = Object.freeze({
 });
 
 export const STATUS_TOOL = "check_approval_status";
+export const EXECUTION_TOOL = "get_execution_result";
 const SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const ENVIRONMENTS = ["public", "development", "staging", "production"];
 const CLASSIFICATIONS = ["public", "internal", "confidential", "restricted"];
@@ -104,7 +105,8 @@ function toolContract(tool) {
       `${tool.label}. Synthetic: nothing real runs. Every call is judged by the gateway policy first. ` +
       `Allowed actions: ${tool.allowedActions.join(", ")}. Allowed scope: ${tool.allowedScopes.join(", ")}. ` +
       `Resource must start with ${schemes}. ` +
-      "A call may run at once, be refused, or return pending_approval. After a human approves, call again with the same arguments plus approvalId.",
+      "A call may run at once, be refused, or return pending_approval. After a human approves, call again with the same arguments plus approvalId. " +
+      "Send an idempotencyKey with the execution call. If the response is lost, repeat the call with the same key and the stored result comes back. A new key is refused.",
     inputSchema: {
       $schema: SCHEMA_DIALECT,
       type: "object",
@@ -141,6 +143,14 @@ function toolContract(tool) {
           maxLength: 128,
           description: "Id from an earlier pending_approval result. Send it with identical arguments once a human has approved.",
         },
+        idempotencyKey: {
+          type: "string",
+          minLength: 8,
+          maxLength: 128,
+          pattern: "^[A-Za-z0-9._:-]+$",
+          description:
+            "Your own unique key for this execution. Repeating a call with the same key and the same arguments returns the stored result and never runs the tool twice.",
+        },
       },
       required: ["action", "resource", "environment", "requestedScopes", "justification"],
       additionalProperties: false,
@@ -163,9 +173,18 @@ function toolContract(tool) {
             "integrity_failed",
             "approval_not_found",
             "invalid_arguments",
+            "executing",
+            "unknown_outcome",
+            "failed",
             "blocked",
           ],
         },
+        state: { type: "string" },
+        resultDigest: { type: ["string", "null"] },
+        resultSummary: { type: ["string", "null"] },
+        errorCode: { type: ["string", "null"] },
+        replayed: { type: "boolean" },
+        idempotencyKey: { type: ["string", "null"] },
         requestId: { type: "string" },
         approvalId: { type: "string" },
         status: { type: "string" },
@@ -231,6 +250,46 @@ const STATUS_CONTRACT = Object.freeze({
   },
 });
 
+const EXECUTION_CONTRACT = Object.freeze({
+  name: EXECUTION_TOOL,
+  title: "Get execution result",
+  description:
+    "Read the recorded outcome of an execution by its executionId. State is executing, executed, failed or unknown_outcome, with a digest of the result. " +
+    "Use it after a lost response. It never runs anything. An execution that stays unconfirmed becomes unknown_outcome and only a person can reconcile it.",
+  inputSchema: {
+    $schema: SCHEMA_DIALECT,
+    type: "object",
+    properties: {
+      executionId: { type: "string", maxLength: 128, description: "The executionId from an execution result." },
+    },
+    required: ["executionId"],
+    additionalProperties: false,
+  },
+  outputSchema: {
+    $schema: SCHEMA_DIALECT,
+    type: "object",
+    properties: {
+      outcome: { type: "string", enum: ["execution_state", "execution_not_found", "invalid_arguments"] },
+      executionId: { type: "string" },
+      approvalId: { type: "string" },
+      toolId: { type: "string" },
+      state: { type: "string", enum: ["executing", "executed", "failed", "unknown_outcome"] },
+      resultDigest: { type: ["string", "null"] },
+      resultSummary: { type: ["string", "null"] },
+      errorCode: { type: ["string", "null"] },
+      timeoutAt: { type: ["string", "null"] },
+      reconciled: { type: ["object", "null"] },
+      next: { type: "string" },
+    },
+    required: ["outcome"],
+  },
+  annotations: {
+    title: "Get execution result",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+});
+
 const SIMULATED_EFFECT = {
   "docs.search": "Pretended to search public documentation and found 3 synthetic documents.",
   "repo.read": "Pretended to read a synthetic repository and list 12 synthetic files.",
@@ -242,7 +301,7 @@ const SIMULATED_EFFECT = {
 };
 
 const KNOWN_ARGUMENTS = {
-  string: ["action", "resource", "environment", "dataClassification", "justification", "context", "approvalId"],
+  string: ["action", "resource", "environment", "dataClassification", "justification", "context", "approvalId", "idempotencyKey"],
   stringArray: ["requestedScopes", "existingScopes"],
   object: ["arguments"],
   boolean: ["skipAnalysis"],
@@ -280,8 +339,9 @@ function checkToolArguments(args) {
   return problems;
 }
 
-function toolResult({ text, structured, isError = false }) {
+function toolResult({ text, structured, isError = false, replayed = false }) {
   return {
+    ...(replayed ? { _meta: { replayed: true } } : {}),
     content: [
       { type: "text", text },
       // The spec asks for the serialized structured value in a text block too.
@@ -305,7 +365,7 @@ export function createMcpServer({
   if (!service || !store || !toolRegistry) throw new Error("service, store and toolRegistry are required");
 
   const registryTools = Object.values(toolRegistry).map(toolContract);
-  const toolList = Object.freeze([...registryTools, STATUS_CONTRACT]);
+  const toolList = Object.freeze([...registryTools, STATUS_CONTRACT, EXECUTION_CONTRACT]);
   const actorLabel = `mcp:${agentId}`;
 
   function recordAudit(eventType, requestId, payload) {
@@ -362,21 +422,85 @@ export function createMcpServer({
     };
   }
 
-  function executed(request, run) {
-    const effect = SIMULATED_EFFECT[request.toolId] ?? "Pretended to run a synthetic action.";
+  function executionStructured(request, ex, extra = {}) {
+    return {
+      ...summarize(request),
+      status: ex.state,
+      executionId: ex.executionId,
+      state: ex.state,
+      resultDigest: ex.resultDigest,
+      resultSummary: ex.resultSummary,
+      errorCode: ex.errorCode,
+      idempotencyKey: ex.idempotencyKey,
+      simulated: true,
+      ...extra,
+    };
+  }
+
+  // Turns what the gateway recorded for an execution into an MCP tool result.
+  // The same function serves a first run and a retry, so a retry cannot say
+  // anything the stored record does not.
+  function executionOutcome(request, run) {
+    const ex = run.execution;
+    const replayed = run.replayed === true;
+    const prefix = replayed ? "REPEATED CALL, NOTHING RAN AGAIN. " : "";
+    const meta = { requestId: request.id, executionId: ex.executionId, replayed };
+    if (ex.state === "executed") {
+      const effect = ex.resultSummary ?? SIMULATED_EFFECT[request.toolId] ?? "Pretended to run a synthetic action.";
+      return {
+        result: toolResult({
+          replayed,
+          text:
+            `${prefix}EXECUTED (simulated). ${effect} No real system was touched. ` +
+            `Execution id ${ex.executionId}, result digest ${ex.resultDigest ?? "none"}. ` +
+            "The approval is used up. Repeating this call with the same idempotencyKey returns this same result.",
+          structured: executionStructured(request, ex, { outcome: "executed", replayed }),
+        }),
+        meta: { ...meta, outcome: "executed" },
+      };
+    }
+    if (ex.state === "failed") {
+      return {
+        result: toolResult({
+          isError: true,
+          replayed,
+          text: `${prefix}FAILED. The synthetic tool reported ${ex.errorCode ?? "an error"}. Nothing was changed. The approval is used up, so a new request is needed to try again.`,
+          structured: executionStructured(request, ex, { outcome: "failed", replayed }),
+        }),
+        meta: { ...meta, outcome: "failed" },
+      };
+    }
+    if (ex.state === "unknown_outcome") {
+      return {
+        result: toolResult({
+          isError: true,
+          replayed,
+          text:
+            `${prefix}OUTCOME UNKNOWN. The tool did not confirm before the timeout, so it may or may not have run. ` +
+            "Do not retry with a new key. A person has to check the downstream system and reconcile execution " +
+            `${ex.executionId} in the review UI. Use ${EXECUTION_TOOL} to see when that is done.`,
+          structured: executionStructured(request, ex, {
+            outcome: "unknown_outcome",
+            replayed,
+            next: "Wait for a person to reconcile. Never dispatch again.",
+          }),
+        }),
+        meta: { ...meta, outcome: "unknown_outcome" },
+      };
+    }
     return {
       result: toolResult({
+        replayed,
         text:
-          `EXECUTED (simulated). ${effect} No real system was touched. ` +
-          `Execution id ${run.execution.id}. The approval is now used up; presenting it again is refused.`,
-        structured: {
-          outcome: "executed",
-          ...summarize(run.request),
-          executionId: run.execution.id,
-          simulated: true,
-        },
+          `${prefix}NOT CONFIRMED YET. The action was reserved and handed to the tool, but no result has been recorded. ` +
+          `Repeat the call with the same idempotencyKey, or call ${EXECUTION_TOOL} with executionId ${ex.executionId}, to read the outcome. Do not use a new key.`,
+        structured: executionStructured(request, ex, {
+          outcome: "executing",
+          replayed,
+          next: `Check again with the same idempotencyKey or ${EXECUTION_TOOL}.`,
+        }),
       }),
-      meta: { requestId: request.id, outcome: "executed", executionId: run.execution.id },
+      meta: { ...meta, outcome: "executing" },
     };
   }
 
@@ -420,13 +544,14 @@ export function createMcpServer({
     );
   }
 
-  function runApproved(request) {
+  function runApproved(request, idempotencyKey) {
     const run = service.execute(request.id, {
       requestHash: request.requestHash,
       actorId: agentId,
       actor: actorLabel,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
     });
-    if (run.ok) return executed(request, run);
+    if (run.ok) return executionOutcome(request, run);
     const outcomeByCode = {
       replay_blocked: "replay_blocked",
       authorization_expired: "expired",
@@ -477,6 +602,9 @@ export function createMcpServer({
       approved: `Approved. Call ${record.toolId} again with identical arguments plus approvalId. It works once and expires at ${record.authorizationExpiresAt}.`,
       denied: "Denied. Do not retry the same request.",
       executed: "Already used. A new request is needed to do it again.",
+      executing: `Reserved and handed to the tool, not confirmed yet. Use ${EXECUTION_TOOL}.`,
+      failed: "The tool reported a failure. A new request is needed to try again.",
+      unknown_outcome: "The outcome is unknown. A person has to reconcile it. Never dispatch again.",
       expired: "Expired. Submit a new request.",
       gate_rejected: "Rejected before review because the handoff was incomplete. Submit a new request.",
       auto_approved: "Auto-approved by policy. Call the tool again with approvalId to execute.",
@@ -498,6 +626,51 @@ export function createMcpServer({
         },
       }),
       meta: { requestId: record.id, outcome: `status_${record.status}` },
+    };
+  }
+
+  function executionTool(args) {
+    const problems = [];
+    if (typeof args.executionId !== "string") problems.push('Missing required argument "executionId".');
+    for (const key of Object.keys(args)) if (key !== "executionId") problems.push(`Unknown argument "${clip(key, 40)}".`);
+    if (problems.length) return invalid(problems);
+    const found = args.executionId.length <= 128 ? service.getExecution(args.executionId) : { ok: false };
+    // Same answer for "no such execution" and "someone else's execution".
+    if (!found.ok || found.request.actorId !== agentId) {
+      return {
+        result: toolResult({
+          isError: true,
+          text: "No execution with that id exists for this agent.",
+          structured: { outcome: "execution_not_found" },
+        }),
+        meta: { requestId: null, outcome: "execution_not_found" },
+      };
+    }
+    const ex = found.execution;
+    const nextByState = {
+      executing: `Reserved, no result recorded yet. After ${ex.timeoutAt} it becomes unknown_outcome. Check again.`,
+      executed: "Done. The result digest is the recorded outcome.",
+      failed: "The tool reported a failure. A new request is needed to try again.",
+      unknown_outcome: "A person has to reconcile this. Never dispatch again.",
+    };
+    return {
+      result: toolResult({
+        text: `Execution ${ex.executionId} is ${ex.state}. ${nextByState[ex.state] ?? ""}`.trim(),
+        structured: {
+          outcome: "execution_state",
+          executionId: ex.executionId,
+          approvalId: ex.approvalId,
+          toolId: ex.toolId,
+          state: ex.state,
+          resultDigest: ex.resultDigest,
+          resultSummary: ex.resultSummary,
+          errorCode: ex.errorCode,
+          timeoutAt: ex.timeoutAt,
+          reconciled: ex.reconciled ? { outcome: ex.reconciled.outcome, role: ex.reconciled.role, at: ex.reconciled.at } : null,
+          next: nextByState[ex.state] ?? "",
+        },
+      }),
+      meta: { requestId: ex.requestId, outcome: `execution_${ex.state}`, executionId: ex.executionId },
     };
   }
 
@@ -534,9 +707,20 @@ export function createMcpServer({
       skipAnalysis: args.skipAnalysis,
     };
 
-    if (args.approvalId !== undefined) {
-      const record = ownedRequest(args.approvalId);
-      if (!record || record.toolId !== name) return notFound(args.approvalId);
+    // A retry whose first response was lost may not know the approval id. If
+    // this agent already used the same idempotencyKey, find that request.
+    let approvalId = args.approvalId;
+    if (approvalId === undefined && args.idempotencyKey !== undefined) {
+      const earlier = service.findByIdempotencyKey(agentId, args.idempotencyKey);
+      if (earlier) {
+        if (earlier.toolId !== name) return invalid(["That idempotencyKey was used with a different tool."]);
+        approvalId = earlier.id;
+      }
+    }
+
+    if (approvalId !== undefined) {
+      const record = ownedRequest(approvalId);
+      if (!record || record.toolId !== name) return notFound(approvalId);
       const requestHash = await requestHashOf(evaluatePolicy(source).input);
       if (requestHash !== record.requestHash) {
         return refusal(
@@ -548,7 +732,7 @@ export function createMcpServer({
       if (record.status === "pending_human") return pending(record);
       if (record.status === "denied") return denied(record);
       if (record.status === "gate_rejected") return gateRejected(record);
-      return runApproved(record);
+      return runApproved(record, args.idempotencyKey);
     }
 
     const submitted = await service.submit(source, actorLabel);
@@ -565,7 +749,7 @@ export function createMcpServer({
     const request = submitted.request;
     switch (request.status) {
       case "auto_approved":
-        return runApproved(request);
+        return runApproved(request, args.idempotencyKey);
       case "pending_human":
         return pending(request);
       case "gate_rejected":
@@ -585,6 +769,7 @@ export function createMcpServer({
       return { error: { code: ERR.INVALID_PARAMS, message: "arguments must be an object." }, meta: { outcome: "invalid_params", tool: clip(name, 128) } };
     }
     if (name === STATUS_TOOL) return statusTool(rawArgs);
+    if (name === EXECUTION_TOOL) return executionTool(rawArgs);
     if (Object.hasOwn(toolRegistry, name)) return callGatewayTool(name, rawArgs);
 
     // Unknown tool: a protocol error, never a bypass. The attempt is still
