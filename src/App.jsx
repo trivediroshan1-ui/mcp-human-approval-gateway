@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ─── Demo mode ────────────────────────────────────────────────────────────────
 // When VITE_STATIC_DEMO=true (GitHub Pages build), all /api calls are handled
@@ -15,12 +15,21 @@ const REVIEWERS = [
   { id: "__requester__", role: "security-lead", label: "The requesting agent (self-approval test)" },
 ];
 
+function newKey() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return `ui-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 const STATUS_COPY = {
   auto_approved: "Auto-approved",
   pending_human: "Human review",
   approved: "Approved",
   denied: "Denied",
+  executing: "Executing",
   executed: "Executed",
+  failed: "Failed",
+  unknown_outcome: "Unknown outcome",
   expired: "Expired",
   gate_rejected: "Gate rejected",
 };
@@ -348,6 +357,10 @@ function DecisionPanel({
   onExecute,
   onReplay,
   onAdvance,
+  onRetry,
+  onReconcile,
+  fault,
+  onFault,
   clockOffset,
 }) {
   const [now, setNow] = useState(Date.now());
@@ -584,6 +597,21 @@ function DecisionPanel({
 
       {IS_DEMO && canExecute && (
         <div className="lab-strip">
+          <span>Lab downstream</span>
+          <p>Make the fake tool misbehave, to test a lost response.</p>
+          <div>
+            <select aria-label="Downstream fault" value={fault} onChange={(event) => onFault(event.target.value)}>
+              <option value="none">Works normally</option>
+              <option value="timeout_after_effect">Runs, but the answer is lost</option>
+              <option value="timeout_before_effect">Never runs, answer lost</option>
+              <option value="fail">Fails cleanly</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {IS_DEMO && canExecute && (
+        <div className="lab-strip">
           <span>Lab clock</span>
           <p>Authorizations expire on the clock. Move it forward to watch the guard refuse an old one.</p>
           <div>
@@ -596,17 +624,79 @@ function DecisionPanel({
         </div>
       )}
 
-      {request.status === "executed" && (
-        <div className="executed-callout">
-          <strong>Execution consumed</strong>
+      {request.execution?.executionId || ["executed", "executing", "failed", "unknown_outcome"].includes(request.status) ? (
+        <div className={`executed-callout exec-${request.status}`} data-testid="execution-card">
+          <strong>
+            {request.status === "executed" && "Execution consumed"}
+            {request.status === "executing" && "Executing, outcome not confirmed yet"}
+            {request.status === "failed" && "Execution failed"}
+            {request.status === "unknown_outcome" && "Unknown outcome, needs a human"}
+          </strong>
           <span>
-            Replay protection active · execution {shortId(request.executionId)}
+            Execution {shortId(request.executionId)} · state {request.status}
           </span>
-          <button type="button" disabled={busy} onClick={onReplay}>
-            Try to replay it
-          </button>
+          {request.execution?.idempotencyKey && <span>Idempotency key {request.execution.idempotencyKey}</span>}
+          {request.execution?.resultDigest && <span>Result digest {request.execution.resultDigest.slice(0, 16)}...</span>}
+          {request.execution?.reconciled && (
+            <span>
+              Reconciled by {request.execution.reconciled.by}: {request.execution.reconciled.reason}
+            </span>
+          )}
+          {request.status === "unknown_outcome" && (
+            <span>
+              The gateway cannot tell whether the tool ran, so it will not run it again. Check the downstream system,
+              then record what you found.
+            </span>
+          )}
+          <div className="exec-actions">
+            <button type="button" disabled={busy} onClick={() => onRetry(true)}>
+              Retry, same key (lost response)
+            </button>
+            <button type="button" disabled={busy} onClick={() => onRetry(false)}>
+              Retry with a new key
+            </button>
+            <button type="button" disabled={busy} onClick={onReplay}>
+              Try to replay it
+            </button>
+            {IS_DEMO && request.status === "executing" && (
+              <button type="button" disabled={busy} onClick={() => onAdvance(6)}>
+                Wait 6 min (lab clock)
+              </button>
+            )}
+          </div>
+          {request.status === "unknown_outcome" && (
+            <div className="exec-actions reconcile-form">
+              <label>
+                Reviewer
+                <select
+                  value={`${reviewer.id}|${reviewer.role}`}
+                  onChange={(event) => {
+                    const [id, role] = event.target.value.split("|");
+                    setReviewer({ id, role });
+                  }}
+                >
+                  {REVIEWERS.map((candidate) => (
+                    <option key={candidate.id} value={`${candidate.id}|${candidate.role}`}>
+                      {candidate.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="reason-field">
+                What did you find downstream?
+                <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} />
+              </label>
+              <button type="button" disabled={busy || reason.trim().length < 12} onClick={() => onReconcile("executed")}>
+                Record: it ran
+              </button>
+              <button type="button" disabled={busy || reason.trim().length < 12} onClick={() => onReconcile("failed")}>
+                Record: it did not run
+              </button>
+              <small>Needs 12+ characters. The requester cannot reconcile their own call.</small>
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
 
       {request.status === "gate_rejected" && (
         <div className="gate-callout">
@@ -954,6 +1044,8 @@ function App() {
   }
 
   function execute() {
+    const key = newKey();
+    setFault("none"); // the lab fault is armed for one call only
     return perform(
       () =>
         api(`/api/requests/${selectedId}/execute`, {
@@ -961,9 +1053,72 @@ function App() {
           body: JSON.stringify({
             requestHash: selected.requestHash,
             actorId: selected.actorId,
+            idempotencyKey: key,
           }),
         }),
-      "Synthetic action executed through the guard.",
+      (result) =>
+        result.execution?.state === "executing"
+          ? "Dispatched, but the answer never came back. The state is executing. Retry with the same key."
+          : result.execution?.state === "failed"
+            ? "The tool failed. The failure is recorded and nothing will be retried on its own."
+            : "Synthetic action executed through the guard.",
+    );
+  }
+
+  async function retry(sameKey) {
+    setBusy(true);
+    setNotice(null);
+    const stored = selected.execution?.idempotencyKey;
+    try {
+      const result = await api(`/api/requests/${selectedId}/execute`, {
+        method: "POST",
+        body: JSON.stringify({
+          requestHash: selected.requestHash,
+          actorId: selected.actorId,
+          idempotencyKey: sameKey ? stored : newKey(),
+        }),
+      });
+      setNotice({
+        type: sameKey && result.replayed ? "success" : "error",
+        message: result.replayed
+          ? `Same key: the stored outcome (${result.execution.state}) came back and nothing ran again.`
+          : "That call was not recognised as a retry. That would be a bug.",
+      });
+    } catch (error) {
+      const blocked = !sameKey && ["replay_blocked", "binding_mismatch"].includes(error.payload?.code);
+      setNotice({
+        type: blocked ? "success" : "error",
+        message: blocked ? `A new key was refused as expected: ${error.message}` : `Unexpected result: ${errorText(error)}`,
+      });
+    }
+    try {
+      await refresh(selectedId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function reconcile(outcome) {
+    return perform(
+      () =>
+        api(`/api/executions/${selected.executionId}/reconcile`, {
+          method: "POST",
+          body: JSON.stringify({
+            reviewerId: reviewer.id === "__requester__" ? selected.actorId : reviewer.id,
+            reviewerRole: reviewer.role,
+            outcome,
+            reason,
+          }),
+        }),
+      "Outcome recorded by a named person and added to the audit log.",
+    );
+  }
+
+  const [fault, setFault] = useState("none");
+  function changeFault(value) {
+    setFault(value);
+    return api("/api/lab/fault", { method: "POST", body: JSON.stringify({ fault: value }) }).catch((error) =>
+      setNotice({ type: "error", message: errorText(error) }),
     );
   }
 
@@ -1052,8 +1207,9 @@ function App() {
   async function runTourStep() {
     const submitScenario = (scenarioId) =>
       api("/api/requests", { method: "POST", body: JSON.stringify({ scenarioId }) });
-    const executeBody = (request) =>
-      JSON.stringify({ requestHash: request.requestHash, actorId: request.actorId });
+    const tourKey = `tour-${tourRequestId ?? "x"}`;
+    const executeBody = (request, key) =>
+      JSON.stringify({ requestHash: request.requestHash, actorId: request.actorId, idempotencyKey: key });
     setBusy(true);
     setNotice(null);
     try {
@@ -1081,13 +1237,24 @@ function App() {
         const current = requests.find((item) => item.id === tourRequestId);
         result = await api(`/api/requests/${tourRequestId}/execute`, {
           method: "POST",
-          body: executeBody(current),
+          body: executeBody(current, tourKey),
         });
-        let replayNote = "The replay was not blocked, which would be a bug.";
+        let replayNote = "The retries were not handled correctly, which would be a bug.";
+        let sameKeyOk = false;
+        let newKeyBlocked = false;
         try {
-          await api(`/api/requests/${tourRequestId}/execute`, { method: "POST", body: executeBody(current) });
+          const again = await api(`/api/requests/${tourRequestId}/execute`, { method: "POST", body: executeBody(current, tourKey) });
+          sameKeyOk = again.replayed === true;
+        } catch {
+          sameKeyOk = false;
+        }
+        try {
+          await api(`/api/requests/${tourRequestId}/execute`, { method: "POST", body: executeBody(current, `${tourKey}-other`) });
         } catch (error) {
-          if (error.payload?.code === "replay_blocked") replayNote = "The replay was refused: the approval was already used.";
+          newKeyBlocked = error.payload?.code === "replay_blocked";
+        }
+        if (sameKeyOk && newKeyBlocked) {
+          replayNote = "Then the answer was treated as lost: the same key returned the stored result and ran nothing again, and a new key was refused.";
         }
         message = `Executed once (synthetic). ${replayNote}`;
       } else {
@@ -1163,6 +1330,10 @@ function App() {
             onExecute={execute}
             onReplay={replay}
             onAdvance={advanceClock}
+            onRetry={retry}
+            onReconcile={reconcile}
+            fault={fault}
+            onFault={changeFault}
             clockOffset={clockOffset}
           />
           <AuditTrail

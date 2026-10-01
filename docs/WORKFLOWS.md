@@ -108,7 +108,32 @@ a person. The lab shows the human the context as quoted, untrusted data.
    needs an anchor: a sequence number and head hash saved somewhere else, passed
    to the verifier.
 
+## 7. A lost response
+
+1. An agent calls a tool with an idempotency key. The gateway reserves the
+   grant, dispatches with a derived key and confirms. The reply never reaches
+   the agent.
+2. The agent repeats the call, same approval, same key. The gateway returns
+   the recorded outcome with `replayed: true` (MCP: `_meta.replayed`). The tool
+   is not called again.
+3. A new key is refused as `replay_blocked`. A changed hash is refused as
+   `binding_mismatch`.
+4. If the tool never confirmed, the retry shows `executing`. After five
+   minutes the state is `unknown_outcome`. A reviewer checks the downstream
+   system and records what happened, with a reason. The gateway never retries
+   it on its own.
+
+In the browser demo, pick "Runs, but the answer is lost" in the lab strip,
+execute, then use the retry buttons and the lab clock.
+
 ## Limits and honest caveats
+
+- Exactly-once needs the downstream to honour the key. The lab tools do, being
+  synthetic. A real tool that ignores keys can still run twice if someone
+  reconciles wrongly.
+- The first call of a keyed MCP request can be found again by key, but a lost
+  response before any approval id exists on a pending request creates a second
+  pending request. Nothing ran, so nothing is doubled.
 
 - All data is synthetic and the executor is simulated.
 - Reviewers are picked from a list. There is no authentication, and reviewer

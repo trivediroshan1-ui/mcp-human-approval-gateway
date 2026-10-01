@@ -67,6 +67,32 @@ Expected result: reject the decision. A security lead is required.
 Expected result: `replay_blocked`. The execution receipt proves the
 authorization has been consumed.
 
+### Response is lost after the tool ran
+
+Expected result: the retry with the same approval and key returns the stored
+outcome and the tool is not called again. A retry with a new key is refused.
+Tests prove one downstream effect under duplicate, concurrent and
+lost-response calls.
+
+### Duplicate dispatch from concurrent callers
+
+Expected result: one compare-and-swap reserves the grant. Every other caller
+gets the recorded state or `replay_blocked`.
+
+### Forged confirm
+
+An attacker who can reach `confirm` could record a false outcome. The dispatch
+key is derived with a per-service secret, never appears in the public record or
+audit payloads, and is required by `confirm`. The lab trusts the caller that
+holds it. A real deployment needs authentication on that call.
+
+### Execution is stuck in `executing`
+
+Expected result: after five minutes the state becomes `unknown_outcome`. A late
+confirm is refused. Only a reviewer other than the requester can reconcile, with
+a reason, and the event is audited. There is no automatic retry because a
+side-effecting tool gives no way to learn whether it ran.
+
 ### Database audit payload is edited
 
 Expected result: hash-chain verification returns `valid: false` and the first
