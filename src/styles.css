@@ -1096,6 +1096,824 @@ footer p {
   font-size: 0.63rem;
 }
 
+/* ── Added: navigation, evidence blocks, lab controls ──────────────────────── */
+
+.top-nav {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.top-nav a {
+  padding: 0.5rem 0.8rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 999px;
+}
+
+.top-nav a:hover {
+  color: var(--text);
+  background: var(--cyan-soft);
+}
+
+.topbar {
+  grid-template-columns: auto auto 1fr auto;
+}
+
+.topbar .header-actions {
+  grid-column: 4;
+}
+
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  margin: 1.4rem 0 0;
+}
+
+.hero-links a {
+  color: var(--cyan);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-underline-offset: 4px;
+}
+
+.workspace {
+  padding-bottom: 1rem;
+}
+
+.arch-panel,
+.limits-panel {
+  margin-top: 1rem;
+}
+
+.limits-panel {
+  margin-bottom: clamp(4rem, 7vw, 7rem);
+}
+
+.check-line {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.check-line.ok {
+  color: var(--green);
+}
+
+.check-line.bad {
+  color: var(--red);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.untrusted-card {
+  margin: 0 0.9rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 180, 91, 0.05);
+  border: 1px dashed rgba(255, 180, 91, 0.4);
+  border-radius: 12px;
+}
+
+.untrusted-card .card-label {
+  color: var(--amber);
+}
+
+.untrusted-card .card-label > span {
+  color: var(--subtle);
+}
+
+.untrusted-card blockquote {
+  margin: 0.6rem 0 0;
+  padding-left: 0.8rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+  border-left: 2px solid rgba(255, 180, 91, 0.5);
+  overflow-wrap: anywhere;
+}
+
+.untrusted-card pre {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: auto;
+}
+
+.analyst-kind {
+  margin: 0.6rem 0 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.64rem;
+  font-weight: 600;
+  line-height: 1.4;
+  border-radius: 8px;
+}
+
+.analyst-kind.sim {
+  color: var(--amber);
+  background: rgba(255, 180, 91, 0.08);
+}
+
+.analyst-kind.model {
+  color: var(--purple);
+  background: rgba(167, 139, 250, 0.1);
+}
+
+.executed-callout button,
+.lab-strip button {
+  padding: 0.5rem 0.8rem;
+  color: var(--cyan);
+  font-size: 0.66rem;
+  font-weight: 700;
+  background: transparent;
+  border: 1px solid rgba(86, 230, 244, 0.32);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.executed-callout button {
+  justify-self: start;
+  margin-top: 0.5rem;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lab-strip {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  margin: 0 0.9rem 0.9rem;
+  padding: 0.7rem 0.9rem;
+  background: rgba(86, 230, 244, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.audit-panel .lab-strip {
+  margin: 0.9rem;
+}
+
+.lab-strip > span {
+  color: var(--cyan);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.lab-strip p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.lab-strip > div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.chain-line {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  font-size: 0.66rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.chain-line.valid {
+  color: var(--muted);
+}
+
+.chain-line.invalid {
+  color: #ffc1c7;
+  background: rgba(255, 111, 125, 0.08);
+}
+
+.chain-line code {
+  color: var(--cyan);
+}
+
+.audit-list article.broken {
+  background: rgba(255, 111, 125, 0.1);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.limits-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  margin: 0;
+}
+
+.limits-list > div {
+  padding: 1.1rem 1.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.limits-list > div:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.limits-list dt {
+  font-family: "Manrope", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.limits-list dd {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+
+/* ── Architecture view ─────────────────────────────────────────────────────── */
+
+.arch-body {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.arch-intro {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.arch-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.arch-select {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(100%, 320px);
+  color: var(--subtle);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.arch-select select {
+  min-height: 42px;
+  padding: 0.5rem 0.7rem;
+  color: var(--text);
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+}
+
+.arch-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.arch-buttons button {
+  min-height: 42px;
+  padding: 0.55rem 1rem;
+  color: var(--cyan);
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: transparent;
+  border: 1px solid rgba(86, 230, 244, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.arch-buttons button:first-child {
+  min-width: 84px;
+  color: #001216;
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.arch-outcome {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 10px;
+}
+
+.arch-outcome strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 0.86rem;
+}
+
+.arch-outcome span {
+  color: var(--muted);
+}
+
+.arch-outcome.tone-ok {
+  border-color: rgba(98, 230, 167, 0.3);
+  border-left-color: var(--green);
+  background: rgba(98, 230, 167, 0.05);
+}
+
+.arch-outcome.tone-ok strong {
+  color: var(--green);
+}
+
+.arch-outcome.tone-blocked {
+  border-color: rgba(255, 111, 125, 0.3);
+  border-left-color: var(--red);
+  background: rgba(255, 111, 125, 0.06);
+}
+
+.arch-outcome.tone-blocked strong {
+  color: var(--red);
+}
+
+.arch-outcome.tone-waiting {
+  border-color: rgba(255, 180, 91, 0.3);
+  border-left-color: var(--amber);
+  background: rgba(255, 180, 91, 0.06);
+}
+
+.arch-outcome.tone-waiting strong {
+  color: var(--amber);
+}
+
+.arch-canvas {
+  padding: 0.8rem;
+  background: rgba(5, 10, 18, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.arch-canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.arch-canvas.is-narrow svg {
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.arch-node rect {
+  fill: var(--surface-2);
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+  transition: stroke 0.3s, fill 0.3s;
+}
+
+.arch-node.off {
+  opacity: 0.4;
+}
+
+.arch-node.reached rect {
+  stroke: rgba(86, 230, 244, 0.7);
+}
+
+.arch-node.current rect {
+  fill: rgba(86, 230, 244, 0.13);
+  stroke: var(--cyan);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 10px rgba(86, 230, 244, 0.4));
+}
+
+.arch-node.advisory rect {
+  stroke-dasharray: 6 5;
+}
+
+.arch-node.terminal rect {
+  stroke: rgba(255, 111, 125, 0.5);
+}
+
+.arch-node.stop-blocked rect {
+  fill: rgba(255, 111, 125, 0.14);
+  stroke: var(--red);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 10px rgba(255, 111, 125, 0.35));
+}
+
+.arch-node.stop-waiting rect {
+  fill: rgba(255, 180, 91, 0.12);
+  stroke: var(--amber);
+  stroke-width: 2.5;
+}
+
+.arch-node.stop-ok rect {
+  fill: rgba(98, 230, 167, 0.12);
+  stroke: var(--green);
+  stroke-width: 2.5;
+}
+
+.arch-node-title {
+  fill: var(--text);
+  font: 700 14px "Manrope", sans-serif;
+}
+
+.arch-node-sub {
+  fill: var(--muted);
+  font: 500 11.5px "DM Sans", sans-serif;
+}
+
+.is-narrow .arch-node-title {
+  font-size: 13px;
+}
+
+.is-narrow .arch-node-sub {
+  font-size: 11px;
+}
+
+.arch-node.advisory .arch-node-title,
+.arch-node.terminal .arch-node-title {
+  font-size: 12px;
+}
+
+.arch-node.advisory .arch-node-sub,
+.arch-node.terminal .arch-node-sub {
+  font-size: 10.5px;
+}
+
+.arch-edge path {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  opacity: 0.55;
+}
+
+.arch-edge.planned path {
+  stroke: rgba(86, 230, 244, 0.5);
+  opacity: 1;
+}
+
+.arch-edge.done path {
+  stroke: var(--cyan);
+}
+
+.arch-edge.dashed path {
+  stroke-dasharray: 5 5;
+}
+
+.arch-edge.danger.planned path {
+  stroke: var(--red);
+}
+
+.arch-edge.flow path {
+  stroke-dasharray: 7 6;
+  animation: arch-flow 0.7s linear infinite;
+}
+
+@keyframes arch-flow {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+.arch-arrowhead {
+  fill: var(--line-strong);
+}
+
+.arch-arrowhead.on {
+  fill: var(--cyan);
+}
+
+.arch-arrowhead.danger {
+  fill: var(--red);
+}
+
+.arch-badge circle {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+}
+
+.arch-badge.planned circle {
+  stroke: var(--cyan);
+}
+
+.arch-badge.danger.planned circle {
+  stroke: var(--red);
+}
+
+.arch-badge.current circle {
+  fill: var(--cyan);
+}
+
+.arch-badge-n {
+  fill: var(--text);
+  font: 800 11px "Manrope", sans-serif;
+}
+
+.arch-badge.current .arch-badge-n {
+  fill: #001216;
+}
+
+.arch-edge-label {
+  fill: var(--muted);
+  font: 600 11.5px "DM Sans", sans-serif;
+}
+
+.arch-badge:not(.planned) {
+  opacity: 0.55;
+}
+
+.arch-band-label {
+  fill: var(--surface-3);
+  stroke: rgba(86, 230, 244, 0.4);
+}
+
+.arch-band-title {
+  fill: var(--cyan);
+  font: 800 12px "Manrope", sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.arch-band-sub {
+  fill: var(--muted);
+  font: 600 11px "DM Sans", sans-serif;
+}
+
+.arch-cell rect {
+  fill: rgba(255, 255, 255, 0.02);
+  stroke: var(--line-strong);
+  stroke-dasharray: 3 4;
+}
+
+.arch-cell text {
+  fill: var(--subtle);
+  font: 600 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.arch-cell.planned rect {
+  stroke: rgba(86, 230, 244, 0.5);
+}
+
+.arch-cell.planned text {
+  fill: var(--muted);
+}
+
+.arch-cell.lit rect {
+  fill: rgba(98, 230, 167, 0.13);
+  stroke: var(--green);
+  stroke-dasharray: none;
+  stroke-width: 1.5;
+}
+
+.arch-cell.lit text {
+  fill: var(--green);
+}
+
+.arch-chain-link {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.arch-tap {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+}
+
+.arch-tap.on {
+  stroke: var(--cyan);
+}
+
+.arch-token-dot {
+  fill: var(--cyan);
+  stroke: #001216;
+  stroke-width: 2;
+}
+
+.arch-token-halo {
+  fill: rgba(86, 230, 244, 0.22);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arch-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes arch-pulse {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.35;
+  }
+}
+
+.arch-caption {
+  padding: 0.9rem 1.1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.arch-caption strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 0.9rem;
+}
+
+.arch-caption p,
+.arch-steps p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.guardrail span {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  color: var(--green);
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(98, 230, 167, 0.1);
+  border-radius: 999px;
+}
+
+.arch-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arch-steps li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  background: rgba(8, 18, 31, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.arch-steps li.skipped {
+  opacity: 0.55;
+}
+
+.arch-steps li.is-current {
+  background: rgba(86, 230, 244, 0.07);
+  border-color: var(--cyan);
+}
+
+.arch-steps li.is-stop.stop-blocked {
+  border-color: var(--red);
+}
+
+.arch-steps li.is-stop.stop-waiting {
+  border-color: var(--amber);
+}
+
+.arch-step-n {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #001216;
+  font-family: "Manrope", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 800;
+  background: var(--cyan);
+  border-radius: 50%;
+}
+
+.arch-steps li.skipped .arch-step-n {
+  color: var(--muted);
+  background: var(--surface-3);
+}
+
+.arch-steps h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  align-items: center;
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+}
+
+.arch-tag {
+  padding: 0.1rem 0.5rem;
+  color: var(--subtle);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+
+.arch-tag.tag-blocked {
+  color: var(--red);
+  border-color: rgba(255, 111, 125, 0.5);
+}
+
+.arch-tag.tag-waiting {
+  color: var(--amber);
+  border-color: rgba(255, 180, 91, 0.5);
+}
+
+@media (max-width: 1000px) {
+  .arch-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+    gap: 0.2rem 1rem;
+    min-height: 0;
+    padding-top: 0.55rem;
+    padding-bottom: 0.45rem;
+  }
+
+  .topbar .header-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .top-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    margin: 0 -0.5rem;
+  }
+
+  .limits-list {
+    grid-template-columns: 1fr;
+  }
+
+  .limits-list > div:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .lab-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .notice {
+    top: 118px;
+  }
+}
+
+@media (max-width: 560px) {
+  .arch-body {
+    padding: 0.9rem;
+  }
+
+  .arch-canvas {
+    padding: 0.4rem;
+  }
+
+  .arch-buttons {
+    width: 100%;
+  }
+
+  .arch-buttons button {
+    flex: 1 1 40%;
+  }
+
+  .arch-steps li {
+    grid-template-columns: 26px 1fr;
+    padding: 0.8rem;
+  }
+}
+
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: 0.8fr 1.2fr;
