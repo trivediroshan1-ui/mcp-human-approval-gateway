@@ -91,6 +91,13 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                requestHash:
+                  type: string
+                  description: SHA-256 the caller expects the approval to be bound to. Must match.
+                actorId:
+                  type: string
+                  description: Requester the caller claims to be. Must match the request.
               additionalProperties: false
       responses:
         "200":
@@ -98,7 +105,7 @@ paths:
         "404":
           description: Request not found
         "409":
-          description: Not authorized, expired or replay blocked
+          description: One of not_authorized, authorization_expired, replay_blocked, binding_mismatch, actor_mismatch, integrity_failed or version_conflict
   /api/audit:
     get:
       operationId: listAuditEvents
@@ -119,6 +126,16 @@ paths:
   /api/audit/verify:
     get:
       operationId: verifyAuditChain
+      parameters:
+        - in: query
+          name: anchorSequence
+          schema:
+            type: integer
+        - in: query
+          name: anchorHash
+          schema:
+            type: string
+          description: With anchorSequence, also checks that the saved head still exists. This is what detects removed tail events.
       responses:
         "200":
           description: Hash-chain verification result

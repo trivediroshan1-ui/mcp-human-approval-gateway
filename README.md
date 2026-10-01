@@ -21,21 +21,35 @@ data or confidential control implementations.
 
 ## What the lab demonstrates
 
-1. Low-risk public research can be auto-approved.
-2. Private source access enters a human-review queue.
-3. Restricted credential metadata requires elevated review while secret values
-   remain unavailable to the AI analyst.
-4. Production privilege changes require a security lead.
+The catalog has nine scenarios. Each one states its expected outcome, the app
+checks the result against it after every run, and `tests/scenarios.test.js`
+asserts the same table on both the server and the browser copy.
+
+1. Public research is auto-approved (low risk, 60 minute authorization).
+2. A private repository read goes to a resource owner.
+3. Restricted credential metadata needs a security lead, and secret values never
+   reach the AI analyst.
+4. A production privilege change needs a security lead.
 5. Prompt-injected context is treated as untrusted data and denied.
 6. Runtime scope expansion is denied and must be submitted as a new request.
-7. Unregistered tools fail closed.
-8. Expired or already-consumed approvals cannot execute.
-9. Audit-event modification is detected by hash-chain verification.
+7. A production deployment needs a security lead.
+8. An unregistered tool fails closed.
+9. An agent that hands off without options, a recommendation or a confidence is
+   stopped by the decision-package gate before a person sees it.
+
+Three more behaviours can be tried from the app: replaying a consumed
+authorization is blocked, an authorization expires (the browser demo has a lab
+clock you can move forward), and editing a stored audit event makes verification
+fail at that event.
+
+The Architecture section animates the path each scenario takes and where it
+stops.
 
 ## Run locally
 
 Prerequisite: Node.js 24 or newer. The prototype uses the built-in
-`node:sqlite` API.
+`node:sqlite` API. The tests also pass on Node 22 (SQLite prints an
+experimental warning there).
 
 ```bash
 npm install
@@ -61,9 +75,9 @@ The Vite client runs on `http://localhost:5174` and proxies API calls to port
 npm run check
 ```
 
-The automated suite covers policy outcomes, reviewer authorization, atomic
-decision commits, approval expiry, single-use execution, audit tamper detection,
-HTTP validation and browser security headers.
+The suite covers policy outcomes, reviewer authorization, request-hash binding,
+atomic decision commits, expiry, single-use execution, audit tamper detection,
+HTTP hardening, server and browser-copy parity and the animated paths.
 
 ## Optional AI analyst
 
@@ -75,9 +89,23 @@ environment variables:
 cp .env.example .env
 ```
 
-The external analyst receives sanitized request metadata, never raw credential
-values. Provider failure falls back to the offline analyst. In every mode, the
-model output remains advisory.
+The offline analyst is a rule-based simulation and the app labels it that way.
+The external analyst receives a fixed list of metadata fields, never context,
+arguments or the resource path, and credential-shaped text is redacted from the
+justification. Provider failure falls back to the offline analyst. In every mode
+the output is advisory: it cannot change a decision or pass the gate.
+
+Two other settings: `AUDIT_HMAC_KEY` signs audit events, and `ALLOW_RESET=false`
+removes the unauthenticated reset route.
+
+## Limits and honest caveats
+
+Data is synthetic, reviewers are simulated (no authentication), the analyst is
+rule-based unless you configure a model, injection detection is a phrase
+heuristic, the hash chain is tamper-evident but not tamper-proof without a key or
+an outside anchor, and none of this is a production control. Details are in
+[Workflows](docs/WORKFLOWS.md) and [SECURITY.md](SECURITY.md). What changed in
+the latest review is in the [changelog](docs/CHANGELOG.md).
 
 ## Design documents
 

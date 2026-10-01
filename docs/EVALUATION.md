@@ -27,6 +27,22 @@ AI explanation sounds convincing.
 | H-01 | JSON content type is required for writes | `http.test.js` |
 | H-02 | Security headers are present | `http.test.js` |
 | H-03 | HEAD returns headers without a response body | `http.test.js` |
+| P-08 | Every catalog scenario ends in its stated outcome, on both the server and the browser copy | `scenarios.test.js` |
+| P-09 | Requester cannot lower the tool's classification or reduce risk with claimed scopes | `security.test.js` |
+| P-10 | Wrong resource type, no scope, prototype names, malformed or oversized input are denied | `security.test.js` |
+| P-11 | Injection phrases are found through spacing, case, width forms and zero-width characters; no scenario text is a false positive; a paraphrase is a documented miss | `security.test.js` |
+| W-07 | Requester cannot approve itself; viewers and unknown roles cannot decide | `scenarios.test.js`, `security.test.js` |
+| W-08 | Approval is bound to a request hash; a changed request or decision revokes it | `security.test.js` |
+| W-09 | Racing executions consume an authorization once, on one connection and across two | `security.test.js` |
+| W-10 | Unreadable expiry fails closed; review window expires stale requests | `security.test.js`, `scenarios.test.js` |
+| W-11 | Blocked execution attempts are audited | `security.test.js` |
+| W-12 | The analyst cannot rename itself, pass or fail the gate, or receive context, arguments, resource paths or credential-shaped text | `security.test.js` |
+| A-03 | Edit of any field, middle deletion, reorder and renumber are detected | `security.test.js` |
+| A-04 | Tail truncation is detected only with an anchor; a keyed chain resists a full rebuild; an unkeyed one does not | `security.test.js` |
+| H-04 | Cross-site text/plain POST, foreign Origin, non-object bodies and bad paths are refused; 500s do not leak | `http-hardening.test.js` |
+| D-01 | Browser copy matches the server: identical source where meant to be, identical results on every scenario and on 3000 generated requests | `parity.test.js` |
+| D-02 | Concurrent audit appends in the browser store cannot fork the chain; corrupted saved state does not break start-up | `security.test.js` |
+| V-01 | The animated path for every scenario ends where policy says it ends | `architecture-model.test.js` |
 
 Run the evidence:
 
