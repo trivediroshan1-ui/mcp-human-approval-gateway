@@ -310,14 +310,20 @@ The Inspector negotiated MCP 2025-11-25. The tools are synthetic. What I saw:
   `replay_blocked`. Nothing ran.
 - `docs.search` with `secrets:read` added to the scopes was denied with
   `scope_outside_contract`.
-- The audit trail showed the Inspector's calls labelled `mcp`
-  (`notifications/initialized`, `tools/list`, both `tools/call` events, and the
-  policy and approval events), and the hash chain verified.
+- The exported audit log (26 events, `valid: true`, unsigned) recorded all of it,
+  each event labelled `mcp`: the `initialize` call with client
+  `mcp-inspector` 2.9.0 and requested version 2025-11-25,
+  `notifications/initialized`, `tools/list` (9 tools), both `tools/call` events,
+  the policy decisions, the human approval by the security lead, the action
+  reserved and confirmed, an `execution.blocked` event with code `replay_blocked`
+  for the reused approval, and a `denied` `tools/call` event for the over-scope
+  request, with the policy reason naming `secrets:read`.
+- The Inspector also sent a `GET` to the endpoint. The gateway answered `405` and
+  logged it as `mcp.rejected` (`method_not_allowed`), as documented above.
 
 Not checked in this run: self-approval by the requesting agent, a changed-resource
-attempt with an old approval, `check_approval_status` from the Inspector, and
-whether the replay and denial events were written to the audit trail (the page
-was reset before I looked). The log is also unsigned.
+attempt with an old approval, and `check_approval_status` from the Inspector. The
+audit log is unsigned, so anyone who can write the store could rebuild it.
 
 ## Sample session
 
