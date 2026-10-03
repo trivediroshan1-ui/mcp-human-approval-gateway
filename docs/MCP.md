@@ -104,7 +104,8 @@ or in a project `.mcp.json`:
 ```
 
 I did not run Claude Code against this server. Which protocol revision it picks
-depends on its runtime, so treat it as untested.
+depends on its runtime, so treat it as untested. The MCP Inspector is the one
+client I ran by hand (see "Tested with MCP Inspector").
 
 ### curl
 
@@ -284,9 +285,39 @@ Not implemented:
 - Pagination. `tools/list` is one page and refuses a cursor.
 - Persistent rate limiting. The limiter is in memory and per process.
 
-Not verified: no third-party MCP client or official SDK has been run against this
-server. The tests drive it with raw JSON-RPC written from the specification, so
-they show the server matches my reading of it, not that every client agrees.
+Tested with one third-party client: the official MCP Inspector v2.9.0, run by hand
+on 3 October 2026 over HTTP, negotiating MCP 2025-11-25 (not 2026-07-28). See
+"Tested with MCP Inspector" below. No other client or SDK has been run against the
+server. The automated tests drive it with raw JSON-RPC written from the
+specification, so they show the server matches my reading of it, not that every
+client agrees.
+
+## Tested with MCP Inspector
+
+On 3 October 2026 I connected the official MCP Inspector v2.9.0 to
+`http://127.0.0.1:4174/mcp` on a 2017 MacBook Air (macOS Monterey, Node 22).
+The Inspector negotiated MCP 2025-11-25. The tools are synthetic. What I saw:
+
+- `tools/list` returned the nine tools.
+- `docs.search` (low risk) executed straight away.
+- `deploy.production` returned `pending_approval` with an `approvalId`. It
+  appeared in the review queue as human review.
+- A reviewer (Morgan, security lead) approved it in the web UI. The request hash
+  shown in the UI matched the one in the Inspector result.
+- Calling `deploy.production` again with the `approvalId` executed it
+  (simulated, `replayed: false`).
+- Calling it a third time with the same `approvalId` was refused with
+  `replay_blocked`. Nothing ran.
+- `docs.search` with `secrets:read` added to the scopes was denied with
+  `scope_outside_contract`.
+- The audit trail showed the Inspector's calls labelled `mcp`
+  (`notifications/initialized`, `tools/list`, both `tools/call` events, and the
+  policy and approval events), and the hash chain verified.
+
+Not checked in this run: self-approval by the requesting agent, a changed-resource
+attempt with an old approval, `check_approval_status` from the Inspector, and
+whether the replay and denial events were written to the audit trail (the page
+was reset before I looked). The log is also unsigned.
 
 ## Sample session
 
