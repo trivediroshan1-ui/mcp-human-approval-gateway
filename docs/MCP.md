@@ -337,9 +337,16 @@ It came back `pending_approval`, and Morgan approved it in the web UI.
 
 I did not export the audit log for this second run.
 
-Not checked: self-approval by the requesting agent, and `check_approval_status`
-from the Inspector. No client other than the Inspector has been run. The audit log
-is unsigned, so anyone who can write the store could rebuild it.
+Also on 4 October 2026 I ran `node --test tests/mcp.test.js` on the same
+MacBook Air: 34 tests, 34 passed, 0 failed. Among them are "the requesting agent
+cannot approve its own request", "an approval expires and then cannot execute" and
+"an approval cannot be reused with different arguments". These are the project's
+own automated tests. I did not try self-approval or expiry by hand with the
+Inspector.
+
+Not checked by hand: self-approval, expiry, and `check_approval_status` from the
+Inspector. No client other than the Inspector has been run. The audit log is
+unsigned, so anyone who can write the store could rebuild it.
 
 ## Sample session
 
