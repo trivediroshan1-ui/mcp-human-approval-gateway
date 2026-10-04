@@ -321,9 +321,25 @@ The Inspector negotiated MCP 2025-11-25. The tools are synthetic. What I saw:
 - The Inspector also sent a `GET` to the endpoint. The gateway answered `405` and
   logged it as `mcp.rejected` (`method_not_allowed`), as documented above.
 
-Not checked in this run: self-approval by the requesting agent, a changed-resource
-attempt with an old approval, and `check_approval_status` from the Inspector. The
-audit log is unsigned, so anyone who can write the store could rebuild it.
+### Changed-request check (4 October 2026)
+
+Same setup, a fresh `deploy.production` request for `service://payment-api`.
+It came back `pending_approval`, and Morgan approved it in the web UI.
+
+- Calling again with the `approvalId` but the resource changed to
+  `service://payment-api-v2` was refused with `binding_mismatch`: "These
+  arguments are not the ones that were reviewed. Nothing was executed." The
+  approval stayed `approved`. The request hash in the refusal was the one the
+  reviewer approved.
+- Calling again with the original, unchanged arguments and the same `approvalId`
+  executed once (simulated, `replayed: false`), and the result said the approval
+  was used up.
+
+I did not export the audit log for this second run.
+
+Not checked: self-approval by the requesting agent, and `check_approval_status`
+from the Inspector. No client other than the Inspector has been run. The audit log
+is unsigned, so anyone who can write the store could rebuild it.
 
 ## Sample session
 
