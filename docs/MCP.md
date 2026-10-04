@@ -335,7 +335,9 @@ It came back `pending_approval`, and Morgan approved it in the web UI.
   executed once (simulated, `replayed: false`), and the result said the approval
   was used up.
 
-I did not export the audit log for this second run.
+The lab's decision record showed the refusal as its own event, an `mcp.tools_call`
+for `deploy.production` with outcome `binding_mismatch`, and the chain verified
+(25 events, unsigned). I did not export the audit log file for this second run.
 
 Also on 4 October 2026 I ran `node --test tests/mcp.test.js` on the same
 MacBook Air: 34 tests, 34 passed, 0 failed. Among them are "the requesting agent
