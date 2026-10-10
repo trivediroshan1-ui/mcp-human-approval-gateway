@@ -7,3 +7,4 @@ data/*.db-wal
 coverage/
 *.log
 .DS_Store
+results/
