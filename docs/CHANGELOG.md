@@ -1,5 +1,21 @@
 # Changelog
 
+## Approval must have a human decision behind it
+
+- Execution now refuses a request whose status says `approved` but has no stored
+  human approval (`integrity_failed`, authorization revoked). Found by editing the
+  status directly in the database: before this change the call executed and the
+  audit chain still verified, because no event had been removed. Test:
+  `tests/forged-status.test.js`.
+- New runner `scripts/run-use-cases.mjs` runs every use case against its own
+  gateway copies and writes a results file. It now includes database-tamper cases
+  (D1 to D3) and an approval-fatigue case (F1).
+- Known and not yet changed: the status tool can show `executing` or
+  `pending_human` after the result tool or an expiry has moved on; text rules
+  (trimming and lowercasing of top-level fields, exact comparison inside
+  `arguments`) are not written down or versioned; reviewer identity is asserted,
+  not authenticated; a missing `AUDIT_HMAC_KEY` verifies as valid but unsigned.
+
 ## Lost-response handling
 
 - The architecture view now shows reserve, dispatch and confirm (steps 10 to 12), with a

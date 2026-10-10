@@ -114,6 +114,27 @@ bug. With the key: `signature_invalid`.
 Expected result: the guard recomputes the request hash, sees the difference and
 revokes the authorization (`integrity_failed`).
 
+### Request is flipped to approved in the database with no human decision
+
+Expected result: execution is refused (`integrity_failed`) because no stored
+human approval matches the request. Before this was checked, the call executed
+and the audit chain still verified, since nothing had been removed from it. A
+writer who can also insert a matching decision row and rebuild an unkeyed chain
+is still a limit (see the previous cases).
+
+### Reviewer name that does not exist
+
+Expected result today: accepted. Reviewer identity is asserted, not proven, so a
+made-up name with the right role can approve and the audit log records that name.
+Authenticating reviewers is out of scope here and is the biggest open limit.
+
+### Many approvals in a row
+
+Expected result: nothing slows or questions the reviewer. 40 production deploys
+approved back to back with the same reason were all accepted in under a second.
+Only the request rate limit applies. A gateway alone does not address approval
+fatigue.
+
 ### Agent claims a public classification for a private tool
 
 Expected result: ignored. The registry sensitivity is the floor.

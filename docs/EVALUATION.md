@@ -42,6 +42,7 @@ AI explanation sounds convincing.
 | H-04 | Cross-site text/plain POST, foreign Origin, non-object bodies and bad paths are refused; 500s do not leak | `http-hardening.test.js` |
 | D-01 | Browser copy matches the server: identical source where meant to be, identical results on every scenario and on 3000 generated requests | `parity.test.js` |
 | D-02 | Concurrent audit appends in the browser store cannot fork the chain; corrupted saved state does not break start-up | `security.test.js` |
+| W-13 | A request marked approved with no stored human approval cannot execute | `forged-status.test.js` |
 | V-01 | The animated path for every scenario ends where policy says it ends | `architecture-model.test.js` |
 
 Run the evidence:
@@ -49,6 +50,15 @@ Run the evidence:
 ```bash
 npm test
 ```
+
+Run every use case end to end (separate from the unit suite, about two minutes):
+
+```bash
+node scripts/run-use-cases.mjs
+```
+
+Each case lists what was expected and what happened, and flags the ones that
+differed from the prediction. Those are the useful ones.
 
 Build and test together:
 

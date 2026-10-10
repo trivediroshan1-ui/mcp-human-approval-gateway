@@ -80,10 +80,22 @@ The Vite client runs on `http://localhost:5174` and proxies API calls to port
 npm run check
 ```
 
-The suite (198 tests under Node 22) covers policy outcomes, reviewer authorization, request-hash binding,
+The suite (204 tests under Node 22) covers policy outcomes, reviewer authorization, request-hash binding,
 atomic decision commits, expiry, single-use execution, audit tamper detection,
 HTTP hardening, server and browser-copy parity, the animated paths, and the MCP
 server (raw JSON-RPC over HTTP and a stdio child process).
+
+To run every use case in one go against real copies of the gateway, with a
+results file at the end (about two minutes, Node 22 or newer):
+
+```bash
+node scripts/run-use-cases.mjs              # add --real-wait for the real 11-minute expiry
+```
+
+It covers changed requests after approval, text and encoding variants, time,
+people and abuse, lost replies, restarts, every tool tier, protocol hygiene,
+database tampering and approval fatigue. Each case records what was expected and
+what happened. Results go to `results/` (not committed). Everything is synthetic.
 
 ## MCP server
 
@@ -128,7 +140,7 @@ removes the unauthenticated reset route.
 
 Data is synthetic, reviewers are simulated (no authentication), the analyst is
 rule-based unless you configure a model, injection detection is a phrase
-heuristic, the hash chain is tamper-evident but not tamper-proof without a key or
+heuristic, reviewer names are typed in and not proven, the hash chain is tamper-evident but not tamper-proof without a key or
 an outside anchor, and none of this is a production control. Details are in
 [Workflows](docs/WORKFLOWS.md) and [SECURITY.md](SECURITY.md). What changed in
 the latest review is in the [changelog](docs/CHANGELOG.md).
