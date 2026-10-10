@@ -484,8 +484,12 @@ export function createGatewayService({
       // difference revokes the authorization.
       const approval = request.status === "approved" ? store.latestDecision(request.id) : null;
       const recomputed = await requestHashOf(request);
+      // A request that says "approved" must have a stored human approval behind it.
+      // Without one (for example the status was changed straight in the database)
+      // the authorization is treated as forged.
+      const missingHumanApproval = request.status === "approved" && (!approval || approval.decision !== "approve");
       const approvedHash = approval ? approval.requestHash : request.requestHash;
-      if (recomputed !== request.requestHash || recomputed !== approvedHash) {
+      if (missingHumanApproval || recomputed !== request.requestHash || recomputed !== approvedHash) {
         await store.transitionWithAudit(
           request.id,
           request.version,

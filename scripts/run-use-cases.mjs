@@ -19,6 +19,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir, platform, release, arch } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DatabaseSync } from "node:sqlite";
 import { startMcpFixture, SCENARIOS, scenarioArguments } from "../tests/helpers/mcp-fixture.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -385,6 +386,32 @@ async function realWaitCase() {
   } finally { await gw.stop(); }
 }
 
+
+// ---------- database tampering and approval fatigue ----------
+async function dbSuite() {
+  const open = async (name) => { const gw = await startGateway({ db: join(tmp, name + ".db") }); return gw; };
+  { // D1
+    const gw = await open("d1"); const c = gw.client; const p = await pending(c, "D1"); await c.review(p.id);
+    const db = new DatabaseSync(gw.db); db.prepare("UPDATE requests SET resource='service://somewhere-else' WHERE id=?").run(p.id); db.close();
+    const e = await c.tool("deploy.production", { ...p.args, approvalId: p.id });
+    record("D1", "K. Database tampering", "Stored request edited in the database after approval, then the agent executes the original", "integrity_failed", c.out(e)?.outcome, [{ note: "execute", ...sum(c, e) }]); await gw.stop(); }
+  { // D2
+    const gw = await open("d2"); const c = gw.client; const p = await pending(c, "D2");
+    const db = new DatabaseSync(gw.db); db.prepare("UPDATE requests SET status='approved', authorization_expires_at=? WHERE id=?").run(new Date(Date.now() + 600000).toISOString(), p.id); db.close();
+    const e = await c.tool("deploy.production", { ...p.args, approvalId: p.id });
+    record("D2", "K. Database tampering", "Pending request flipped to approved straight in the database, no human decision behind it", "integrity_failed", c.out(e)?.outcome, [{ note: "execute", ...sum(c, e) }, { note: "audit chain", ...(await c.verify()) }]); await gw.stop(); }
+  { // D3
+    const gw = await open("d3"); const c = gw.client; const p = await pending(c, "D3"); await c.review(p.id);
+    const before = await c.verify();
+    const db = new DatabaseSync(gw.db); db.prepare("UPDATE audit_events SET actor='someone-else' WHERE sequence=2").run(); db.close();
+    const after = await c.verify();
+    record("D3", "K. Database tampering", "One audit event edited in the database (signed chain)", "hash_mismatch at event 2", after.valid ? "still valid" : `${after.reason} at event ${after.failedSequence}`, [{ before, after }], { pass: before.valid === true && after.valid === false && after.failedSequence === 2 }); await gw.stop(); }
+  { // F1
+    const gw = await open("f1"); const c = gw.client; const t0 = Date.now(); let ok = 0;
+    for (let i = 0; i < 40; i++) { const p = await pending(c, "F1-" + i, { resource: `service://svc-${i}` }); const r = await c.review(p.id, { reason: "Looks fine, approving" }); if (r.status === 200) ok++; }
+    record("F1", "L. People", "Approval fatigue: 40 production deploys approved back to back with the same one-line reason", "for information", `${ok} of 40 accepted in ${((Date.now() - t0) / 1000).toFixed(1)}s, no friction`, [], { info: true }); await gw.stop(); }
+}
+
 // ---------- main ----------
 const started = new Date();
 console.log(`HumanGate use-case run, ${started.toISOString()}\nNode ${process.version} on ${platform()} ${release()} ${arch()}\n`);
@@ -394,6 +421,7 @@ try {
   await restartSuite();
   await twoAgents();
   await fixtureSuite();
+  await dbSuite();
   runRepoTests();
   if (realWait) await realWaitCase();
 } finally {
