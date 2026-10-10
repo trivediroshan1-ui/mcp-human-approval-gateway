@@ -43,7 +43,8 @@ reviewer can approve in the web UI while an agent talks over stdio.
 | `MCP_HTTP` | `true` on loopback, `false` elsewhere | Turns `POST /mcp` on or off. |
 | `MCP_ALLOWED_HOSTS` | none | Extra Host names to accept, comma separated, for use behind a proxy. |
 | `MCP_ALLOWED_ORIGINS` | none | Extra full origins to accept, comma separated. |
-| `AUDIT_HMAC_KEY` | none | Signs audit events. Never returned over MCP. |
+| `AUDIT_HMAC_KEY` | none | Signs audit events. Never returned over MCP. Without it, verification returns a warning. |
+| `REVIEWER_ALLOWLIST` | none | `name:role,name:role`. Limits which typed reviewer names and roles count. Names are still not authenticated. |
 
 ## Connect a client
 

@@ -133,7 +133,7 @@ arguments or the resource path, and credential-shaped text is redacted from the
 justification. Provider failure falls back to the offline analyst. In every mode
 the output is advisory: it cannot change a decision or pass the gate.
 
-Two other settings: `AUDIT_HMAC_KEY` signs audit events, and `ALLOW_RESET=false`
+Three other settings: `AUDIT_HMAC_KEY` signs audit events, `REVIEWER_ALLOWLIST="name:role,..."` limits which typed reviewer names count (it is not authentication), and `ALLOW_RESET=false`
 removes the unauthenticated reset route.
 
 ## Limits and honest caveats

@@ -43,6 +43,10 @@ AI explanation sounds convincing.
 | D-01 | Browser copy matches the server: identical source where meant to be, identical results on every scenario and on 3000 generated requests | `parity.test.js` |
 | D-02 | Concurrent audit appends in the browser store cannot fork the chain; corrupted saved state does not break start-up | `security.test.js` |
 | W-13 | A request marked approved with no stored human approval cannot execute | `forged-status.test.js` |
+| W-14 | The status tool settles stuck reservations and queue-expired requests before answering | `open-findings.test.js` |
+| W-15 | Optional reviewer allowlist refuses unlisted names and wrong roles | `open-findings.test.js` |
+| W-16 | Audit verification warns when the chain is unsigned | `open-findings.test.js` |
+| W-17 | The binding rules (trim, lowercase, sorted scopes, exact arguments, existingScopes unbound) | `open-findings.test.js` |
 | V-01 | The animated path for every scenario ends where policy says it ends | `architecture-model.test.js` |
 
 Run the evidence:

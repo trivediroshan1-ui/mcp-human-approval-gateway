@@ -31,7 +31,7 @@
 - New runner `scripts/run-use-cases.mjs` runs every use case against its own
   gateway copies and writes a results file. It now includes database-tamper cases
   (D1 to D3) and an approval-fatigue case (F1).
-- Known and not yet changed: the status tool can show `executing` or
+- Known at the time (all but reviewer identity are closed in the entry above): the status tool can show `executing` or
   `pending_human` after the result tool or an expiry has moved on; text rules
   (trimming and lowercasing of top-level fields, exact comparison inside
   `arguments`) are not written down or versioned; reviewer identity is asserted,
