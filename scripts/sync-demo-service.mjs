@@ -32,10 +32,10 @@ export function generateDemoService(serverSource) {
   s = s.replace("const currentHash = requestHashOf(request);", "const currentHash = await requestHashOf(request);");
   // Two-phase execution. Every service method that touches the store becomes
   // async, and calls between them are awaited. hashEvent is async in the browser.
-  for (const name of ["reserve", "dispatch", "confirm", "settleStuck", "getExecution", "sweep", "reconcile"]) {
+  for (const name of ["reserve", "dispatch", "confirm", "settleStuck", "getExecution", "getFresh", "sweep", "reconcile"]) {
     s = s.replace(`    ${name}(`, `    async ${name}(`);
   }
-  s = s.replace(/this\.(reserve|dispatch|confirm|settleStuck|getExecution|reconcile)\(/g, "await this.$1(");
+  s = s.replace(/this\.(reserve|dispatch|confirm|settleStuck|getExecution|getFresh|reconcile)\(/g, "await this.$1(");
   s = s.replace(/(?<![A-Za-z.])hashEvent\(/g, "await hashEvent(");
   s = s.replace("    decide(id, input = {}) {", "    async decide(id, input = {}) {");
   s = s.replace("    execute(id, options = {}) {", "    async execute(id, options = {}) {");

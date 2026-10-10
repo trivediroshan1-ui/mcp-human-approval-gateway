@@ -325,6 +325,9 @@ function checkToolArguments(args) {
   for (const key of KNOWN_ARGUMENTS.string) {
     if (args[key] !== undefined && typeof args[key] !== "string") problems.push(`"${key}" must be a string.`);
   }
+  if (typeof args.approvalId === "string" && args.approvalId.length > 128) {
+    problems.push('"approvalId" must be at most 128 characters.');
+  }
   for (const key of KNOWN_ARGUMENTS.stringArray) {
     if (args[key] !== undefined && !(Array.isArray(args[key]) && args[key].every((v) => typeof v === "string"))) {
       problems.push(`"${key}" must be an array of strings.`);
@@ -566,9 +569,9 @@ export function createMcpServer({
     );
   }
 
-  function ownedRequest(approvalId) {
+  function ownedRequest(approvalId, { fresh = false } = {}) {
     if (typeof approvalId !== "string" || approvalId.length === 0 || approvalId.length > 128) return null;
-    const record = service.get(approvalId);
+    const record = fresh ? service.getFresh(approvalId) : service.get(approvalId);
     // Same answer for "no such id" and "someone else's id" so ids cannot be probed.
     if (!record || record.actorId !== agentId) return null;
     return record;
@@ -590,7 +593,8 @@ export function createMcpServer({
     if (typeof args.approvalId !== "string") problems.push('Missing required argument "approvalId".');
     for (const key of Object.keys(args)) if (key !== "approvalId") problems.push(`Unknown argument "${clip(key, 40)}".`);
     if (problems.length) return invalid(problems);
-    const record = ownedRequest(args.approvalId);
+    if (args.approvalId.length > 128) return invalid(['"approvalId" must be at most 128 characters.']);
+    const record = ownedRequest(args.approvalId, { fresh: true });
     if (!record) return notFound(args.approvalId);
     const last =
       [...(record.decisions ?? [])].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] ?? null;

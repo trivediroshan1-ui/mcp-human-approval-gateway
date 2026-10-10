@@ -24,7 +24,19 @@ const isLoopback = ["127.0.0.1", "localhost", "::1"].includes(host);
 // without the key cannot rebuild the chain. ALLOW_RESET=false removes the
 // unauthenticated reset route.
 const store = createStore(databasePath, { auditKey: process.env.AUDIT_HMAC_KEY || null });
-const service = createGatewayService({ store });
+// REVIEWER_ALLOWLIST (optional): "alice:security-lead,bob:resource-owner".
+// Without it any typed name is accepted, so the startup log says so.
+const reviewerAllowlist = process.env.REVIEWER_ALLOWLIST
+  ? Object.fromEntries(
+      process.env.REVIEWER_ALLOWLIST.split(",")
+        .map((pair) => pair.trim().split(":"))
+        .filter((p) => p.length === 2 && p[0] && p[1])
+        .map(([id, role]) => [id.trim().toLowerCase(), role.trim()]),
+    )
+  : null;
+if (!reviewerAllowlist) console.warn("Warning: reviewer names are typed in, not proven. Set REVIEWER_ALLOWLIST to restrict who can decide.");
+if (!process.env.AUDIT_HMAC_KEY) console.warn("Warning: AUDIT_HMAC_KEY is not set. The audit chain is valid but unsigned.");
+const service = createGatewayService({ store, reviewerAllowlist });
 if (store.listAudit(null, 1).length === 0) service.reset("gateway-startup");
 
 // The MCP endpoint (POST /mcp) is on by default only when the server is bound

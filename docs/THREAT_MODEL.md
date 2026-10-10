@@ -154,3 +154,20 @@ Expected result: ignored. The registry sensitivity is the floor.
 
 These gaps are deliberate and are listed so the prototype is not mistaken for a
 production security product.
+
+## Binding rules (what counts as "the same request")
+
+The request hash covers: policy version, actor, tool, action, resource,
+environment, data classification, requested scopes, arguments, justification and
+context. Before hashing: top-level text is trimmed; `environment` and
+`dataClassification` are lowercased; `requestedScopes` are de-duplicated and
+sorted; `arguments` are compared exactly (case, spacing and key values count; key
+order does not); `existingScopes` are self-reported and not part of the hash.
+A trailing space on `justification` therefore does not change the hash, while a
+changed value inside `arguments` does. Pinned by `tests/open-findings.test.js`.
+
+## Reviewer identity
+
+Reviewer names are typed in, not proven. `REVIEWER_ALLOWLIST` limits which typed
+names and roles count, which stops casual misuse but is not authentication.
+Put a real identity check in front of the review route for anything beyond a lab.

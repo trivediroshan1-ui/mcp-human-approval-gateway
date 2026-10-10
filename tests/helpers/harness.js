@@ -24,7 +24,7 @@ function clockFixture(initial = START) {
 export function serverHarness(options = {}) {
   const time = clockFixture();
   const store = createServerStore(options.path ?? ":memory:", options.storeOptions);
-  const service = createServerService({ store, clock: time.clock, analyzer: options.analyzer, downstream: options.downstream });
+  const service = createServerService({ store, clock: time.clock, analyzer: options.analyzer, downstream: options.downstream, reviewerAllowlist: options.reviewerAllowlist });
   return { name: "server", store, service, time, close: () => store.close() };
 }
 

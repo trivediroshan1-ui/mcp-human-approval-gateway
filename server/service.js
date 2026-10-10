@@ -62,8 +62,16 @@ export function createGatewayService({
   analyzer = analyzeRequest,
   downstream = createFakeDownstream(),
   dispatchSecret = randomUUID(),
+  // Optional: { "alice": "security-lead", ... }. When set, a reviewer must be
+  // listed and must use the listed role. Names are still typed, not proven.
+  reviewerAllowlist = null,
 } = {}) {
   if (!store) throw new Error("A store is required");
+
+  function reviewerListed(reviewerId, reviewerRole) {
+    if (!reviewerAllowlist) return true;
+    return reviewerAllowlist[reviewerId.toLowerCase()] === reviewerRole;
+  }
 
   function executionView(request) {
     if (!request?.executionId) return null;
@@ -266,6 +274,34 @@ export function createGatewayService({
       return publicRequest(store.getRequest(id), store);
     },
 
+    // Read a request after settling anything time has already decided: a stuck
+    // reservation becomes unknown_outcome and a request that waited past the
+    // review window becomes expired. Plain get() stays read-only.
+    getFresh(id) {
+      let request = store.getRequest(id);
+      if (!request) return null;
+      request = this.settleStuck(request);
+      if (request.status === "pending_human") {
+        const now = clock().toISOString();
+        const queuedUntil = Date.parse(request.createdAt) + REVIEW_WINDOW_MINUTES * 60_000;
+        if (!(Date.parse(now) <= queuedUntil)) {
+          const moved = store.transitionWithAudit(
+            request.id,
+            request.version,
+            { status: "expired", updatedAt: now },
+            {
+              eventType: "review.expired",
+              actor: "mcp-execution-guard",
+              createdAt: now,
+              payload: { reviewWindowMinutes: REVIEW_WINDOW_MINUTES },
+            },
+          );
+          request = moved.ok ? moved.request : (store.getRequest(request.id) ?? request);
+        }
+      }
+      return publicRequest(request, store);
+    },
+
     list(limit) {
       return store.listRequests(limit).map((request) => publicRequest(request, store));
     },
@@ -312,6 +348,13 @@ export function createGatewayService({
           ok: false,
           code: "insufficient_role",
           message: "The reviewer role cannot decide on requests.",
+        };
+      }
+      if (!reviewerListed(reviewerId, reviewerRole)) {
+        return {
+          ok: false,
+          code: "insufficient_role",
+          message: "This reviewer is not on the allowlist for that role.",
         };
       }
       if (decision === "approve" && sameIdentity(reviewerId, request.actorId)) {
@@ -856,6 +899,13 @@ export function createGatewayService({
           ok: false,
           code: "invalid_state",
           message: `Only an unknown_outcome execution can be reconciled. This one is ${request.status}.`,
+        };
+      }
+      if (!reviewerListed(reviewerId, reviewerRole)) {
+        return {
+          ok: false,
+          code: "insufficient_role",
+          message: "This reviewer is not on the allowlist for that role.",
         };
       }
       if (!reviewerCanDecide(reviewerRole) || !reviewerCanApprove(reviewerRole, request.approvalRole ?? "resource-owner")) {

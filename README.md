@@ -80,7 +80,7 @@ The Vite client runs on `http://localhost:5174` and proxies API calls to port
 npm run check
 ```
 
-The suite (204 tests under Node 22) covers policy outcomes, reviewer authorization, request-hash binding,
+The suite (210 tests under Node 22) covers policy outcomes, reviewer authorization, request-hash binding,
 atomic decision commits, expiry, single-use execution, audit tamper detection,
 HTTP hardening, server and browser-copy parity, the animated paths, and the MCP
 server (raw JSON-RPC over HTTP and a stdio child process).

@@ -516,6 +516,9 @@ export function createStore(databasePath = ":memory:", { auditKey = null } = {})
         headSequence: previousSequence,
         headHash: previousHash,
         signed: Boolean(auditKey),
+        ...(auditKey
+          ? {}
+          : { warning: "The chain is unsigned. Anyone who can write the database can rebuild it. Set AUDIT_HMAC_KEY." }),
         anchorChecked: Boolean(anchor),
       };
     },

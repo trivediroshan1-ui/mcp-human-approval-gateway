@@ -292,6 +292,7 @@ export function createStore() {
         headSequence: previousSequence,
         headHash: previousHash,
         signed: false,
+        warning: "The chain is unsigned. Anyone who can write the database can rebuild it. Set AUDIT_HMAC_KEY.",
         anchorChecked: Boolean(anchor),
       };
     },

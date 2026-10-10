@@ -1,5 +1,26 @@
 # Changelog
 
+## Open findings closed
+
+- `check_approval_status` now settles time before answering: a reservation past
+  its 5 minute timeout reads as `unknown_outcome`, and a request that waited
+  past the 240 minute queue window reads as `expired`. Both agree with the
+  result tool and with what a reviewer would be told. (`service.getFresh`.)
+- An `approvalId` longer than 128 characters returns `invalid_arguments`
+  instead of looking like an unknown id.
+- Binding rules are written down in `docs/THREAT_MODEL.md` and pinned by a
+  test: top-level text is trimmed, `environment` and `dataClassification` are
+  lowercased, scopes are sorted, `arguments` are compared exactly, and
+  `existingScopes` are not bound.
+- Optional `REVIEWER_ALLOWLIST="name:role,name:role"`. When set, a decision or
+  reconciliation from a name that is not listed with that role is refused. Names
+  are still typed, not proven. Without it the server logs a warning at start.
+- Audit verification returns a `warning` when the chain is unsigned, and the
+  server logs one at start when `AUDIT_HMAC_KEY` is missing.
+- Tests: 210 (6 new in `tests/open-findings.test.js`). Runner: 76 cases, one
+  still different from prediction (T31: with no allowlist, a made-up reviewer
+  name is accepted).
+
 ## Approval must have a human decision behind it
 
 - Execution now refuses a request whose status says `approved` but has no stored
