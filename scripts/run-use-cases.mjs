@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Runs every HumanGate use case in one go and writes one results file.
 //
-//   node scripts/run-use-cases.mjs              (about 2 minutes)
+//   node scripts/run-use-cases.mjs              (about 10 seconds)
 //   node scripts/run-use-cases.mjs --real-wait  (adds the real 11 minute expiry wait, T21-real)
 //
 // What it does: starts its own copies of the gateway on free local ports with a

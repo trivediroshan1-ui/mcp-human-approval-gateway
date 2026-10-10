@@ -86,7 +86,7 @@ HTTP hardening, server and browser-copy parity, the animated paths, and the MCP
 server (raw JSON-RPC over HTTP and a stdio child process).
 
 To run every use case in one go against real copies of the gateway, with a
-results file at the end (about two minutes, Node 22 or newer):
+results file at the end (about ten seconds, Node 22 or newer):
 
 ```bash
 node scripts/run-use-cases.mjs              # add --real-wait for the real 11-minute expiry

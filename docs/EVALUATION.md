@@ -51,7 +51,7 @@ Run the evidence:
 npm test
 ```
 
-Run every use case end to end (separate from the unit suite, about two minutes):
+Run every use case end to end (separate from the unit suite, about ten seconds):
 
 ```bash
 node scripts/run-use-cases.mjs
