@@ -95,6 +95,7 @@ node scripts/run-change-cases.mjs             # policy and tool definition chang
 node scripts/run-second-client.mjs            # a client with the older handshake
 node scripts/run-binding-profiles.mjs         # prototype of fields that may vary, and attempts to abuse it
 node scripts/run-conformance.mjs --label mine # 15 approval-binding checks
+node scripts/run-coverage-cases.mjs           # round three: permit and receipt, identity plane, 20 test-only domain tools (46 checks)
 ```
 
 It covers changed requests after approval, text and encoding variants, time,

@@ -84,6 +84,14 @@ run each, on a Mac (Node 22) and on Linux, synthetic data and temporary database
 | `run-binding-profiles.mjs` | X1 (8) and X2 (17) | prototype only; none of 17 smuggling attempts executed |
 | `run-conformance.mjs` | B01 to B14 plus B02b (15) | 15 of 15; a deliberately weakened copy fails B06 |
 
+## Round three evidence (17 October 2026, evening)
+
+`run-coverage-cases.mjs`, 46 checks, one run on Linux (Node 22.22.2), synthetic data.
+P1 to P5b (permit and receipt), I1 to I11 (identity plane, 19 rows), S1 to S21
+(20 test-only domain tools run end to end). 45 as expected, 1 recorded. The first run
+had two mistakes in my own checks (a pattern that matched "self-reported" and a
+version test that matched a date); they were fixed and the script run again.
+
 Also done by hand on 17 October: the real Claude Code as the agent, with a person
 approving (asked, waited, ran once, a retry with the same key returned the stored
 result, a new key was refused); the browser lab (hidden characters, long text,

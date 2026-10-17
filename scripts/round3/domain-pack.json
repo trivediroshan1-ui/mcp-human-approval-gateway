@@ -1,0 +1,558 @@
+{
+ "tools": [
+  {
+   "id": "gov.benefit.release",
+   "label": "Release a benefit payment batch",
+   "sector": "Government",
+   "system": "Finance",
+   "baseRisk": 62,
+   "sensitivity": "restricted",
+   "action": "release",
+   "scope": "benefits:release",
+   "scheme": "payments",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": true
+  },
+  {
+   "id": "gov.records.export",
+   "label": "Export citizen records",
+   "sector": "Government",
+   "system": "Registry",
+   "baseRisk": 55,
+   "sensitivity": "restricted",
+   "action": "export",
+   "scope": "records:export",
+   "scheme": "registry",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "gov.licence.issue",
+   "label": "Issue a licence or permit",
+   "sector": "Government",
+   "system": "Case management",
+   "baseRisk": 35,
+   "sensitivity": "confidential",
+   "action": "issue",
+   "scope": "licence:issue",
+   "scheme": "licence",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": false
+  },
+  {
+   "id": "edu.grades.update",
+   "label": "Change a student grade",
+   "sector": "School or college",
+   "system": "Student information system",
+   "baseRisk": 40,
+   "sensitivity": "confidential",
+   "action": "update",
+   "scope": "grades:write",
+   "scheme": "sis",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": false
+  },
+  {
+   "id": "edu.student.records.delete",
+   "label": "Delete student records",
+   "sector": "School or college",
+   "system": "Student information system",
+   "baseRisk": 60,
+   "sensitivity": "restricted",
+   "action": "delete",
+   "scope": "records:delete",
+   "scheme": "sis",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": true
+  },
+  {
+   "id": "edu.exam.paper.read",
+   "label": "Read an unreleased exam paper",
+   "sector": "School or college",
+   "system": "Examinations",
+   "baseRisk": 45,
+   "sensitivity": "restricted",
+   "action": "read",
+   "scope": "exams:read",
+   "scheme": "exams",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "erp.payment.approve",
+   "label": "Approve a vendor payment",
+   "sector": "Private company",
+   "system": "ERP",
+   "baseRisk": 60,
+   "sensitivity": "confidential",
+   "action": "approve",
+   "scope": "payments:approve",
+   "scheme": "erp",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": false
+  },
+  {
+   "id": "erp.vendor.bank.change",
+   "label": "Change vendor bank details",
+   "sector": "Private company",
+   "system": "ERP",
+   "baseRisk": 70,
+   "sensitivity": "restricted",
+   "action": "update",
+   "scope": "vendor:bank",
+   "scheme": "erp",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": false
+  },
+  {
+   "id": "erp.report.read",
+   "label": "Read a sales report",
+   "sector": "Private company",
+   "system": "ERP",
+   "baseRisk": 12,
+   "sensitivity": "internal",
+   "action": "read",
+   "scope": "reports:read",
+   "scheme": "erp",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "it.password.reset",
+   "label": "Reset a user password",
+   "sector": "Any organisation",
+   "system": "IT and IAM",
+   "baseRisk": 55,
+   "sensitivity": "restricted",
+   "action": "reset",
+   "scope": "password:reset",
+   "scheme": "directory",
+   "credentialAccess": true,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "it.mfa.reset",
+   "label": "Reset a user MFA enrolment",
+   "sector": "Any organisation",
+   "system": "IT and IAM",
+   "baseRisk": 65,
+   "sensitivity": "restricted",
+   "action": "reset",
+   "scope": "mfa:reset",
+   "scheme": "directory",
+   "credentialAccess": true,
+   "privilegeChange": true,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "it.apikey.rotate",
+   "label": "Rotate an API key",
+   "sector": "Any organisation",
+   "system": "IT and API",
+   "baseRisk": 45,
+   "sensitivity": "confidential",
+   "action": "rotate",
+   "scope": "apikey:rotate",
+   "scheme": "vault",
+   "credentialAccess": true,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": false
+  },
+  {
+   "id": "it.service-account.create",
+   "label": "Create a service account (non-human identity)",
+   "sector": "Any organisation",
+   "system": "IT and IAM",
+   "baseRisk": 60,
+   "sensitivity": "restricted",
+   "action": "create",
+   "scope": "nhi:create",
+   "scheme": "directory",
+   "credentialAccess": false,
+   "privilegeChange": true,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "it.sso.app.assign",
+   "label": "Assign a user to an SSO application",
+   "sector": "Any organisation",
+   "system": "IT and SSO",
+   "baseRisk": 40,
+   "sensitivity": "confidential",
+   "action": "assign",
+   "scope": "sso:assign",
+   "scheme": "sso",
+   "credentialAccess": false,
+   "privilegeChange": true,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "ot.plc.setpoint.write",
+   "label": "Change a PLC setpoint",
+   "sector": "Industrial plant",
+   "system": "OT",
+   "baseRisk": 75,
+   "sensitivity": "restricted",
+   "action": "write",
+   "scope": "plc:write",
+   "scheme": "plc",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": true
+  },
+  {
+   "id": "ot.sensor.read",
+   "label": "Read plant sensor values",
+   "sector": "Industrial plant",
+   "system": "OT",
+   "baseRisk": 10,
+   "sensitivity": "internal",
+   "action": "read",
+   "scope": "sensor:read",
+   "scheme": "plc",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "rpa.bot.run",
+   "label": "Run a robot (RPA) process",
+   "sector": "Any organisation",
+   "system": "Robots",
+   "baseRisk": 50,
+   "sensitivity": "confidential",
+   "action": "run",
+   "scope": "bot:run",
+   "scheme": "rpa",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": true,
+   "destructive": false
+  },
+  {
+   "id": "it.password.reset.loose",
+   "label": "Reset a user password, defined carelessly",
+   "sector": "Any organisation",
+   "system": "IT and IAM",
+   "baseRisk": 20,
+   "sensitivity": "internal",
+   "action": "reset",
+   "scope": "password:reset",
+   "scheme": "directory",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "erp.payment.approve.loose",
+   "label": "Approve a vendor payment, defined carelessly",
+   "sector": "Private company",
+   "system": "ERP",
+   "baseRisk": 20,
+   "sensitivity": "internal",
+   "action": "approve",
+   "scope": "payments:approve",
+   "scheme": "erp",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  },
+  {
+   "id": "ot.plc.setpoint.write.loose",
+   "label": "Change a PLC setpoint, defined carelessly",
+   "sector": "Industrial plant",
+   "system": "OT",
+   "baseRisk": 20,
+   "sensitivity": "internal",
+   "action": "write",
+   "scope": "plc:write",
+   "scheme": "plc",
+   "credentialAccess": false,
+   "privilegeChange": false,
+   "productionChange": false,
+   "destructive": false
+  }
+ ],
+ "cases": [
+  {
+   "tool": "gov.benefit.release",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "gov.records.export",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "gov.licence.issue",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 85,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "edu.grades.update",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 90,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "edu.student.records.delete",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "edu.exam.paper.read",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 95,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "erp.payment.approve",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "erp.vendor.bank.change",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "erp.report.read",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 44,
+    "level": "medium",
+    "role": "resource-owner",
+    "window": 30
+   }
+  },
+  {
+   "tool": "erp.report.read",
+   "env": "staging",
+   "requested": "internal",
+   "predicted": {
+    "status": "auto_approved",
+    "score": 26,
+    "level": "low",
+    "role": null,
+    "window": 60
+   }
+  },
+  {
+   "tool": "it.password.reset",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "it.mfa.reset",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "it.apikey.rotate",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "it.service-account.create",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "it.sso.app.assign",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 92,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "ot.plc.setpoint.write",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "ot.sensor.read",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 42,
+    "level": "medium",
+    "role": "resource-owner",
+    "window": 30
+   }
+  },
+  {
+   "tool": "rpa.bot.run",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 100,
+    "level": "critical",
+    "role": "security-lead",
+    "window": 10
+   }
+  },
+  {
+   "tool": "it.password.reset.loose",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 52,
+    "level": "medium",
+    "role": "resource-owner",
+    "window": 30
+   }
+  },
+  {
+   "tool": "erp.payment.approve.loose",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 52,
+    "level": "medium",
+    "role": "resource-owner",
+    "window": 30
+   }
+  },
+  {
+   "tool": "ot.plc.setpoint.write.loose",
+   "env": "production",
+   "requested": "internal",
+   "predicted": {
+    "status": "pending_human",
+    "score": 52,
+    "level": "medium",
+    "role": "resource-owner",
+    "window": 30
+   }
+  }
+ ]
+}

@@ -181,6 +181,35 @@ changed value inside `arguments` does. Pinned by `tests/open-findings.test.js`.
   the queue shows an id and the start of the justification. A person still reads
   one request at a time.
 
+### Known limits found in round three (17 October 2026, evening)
+
+- An approval cannot be withdrawn before it is used. Deny after approve returns
+  `invalid_state` and there is no revoke or cancel route (`I6`). It lapses at its
+  window: 10, 15, 30 or 60 minutes by tier.
+- The downstream tool never sees the approval id, the request hash or the approver.
+  It receives its own key, the tool, action, resource and arguments (`P3`).
+- What the agent gets back carries the request hash, execution id, result digest and
+  idempotency key, but no approver name, no policy version and no signature. The
+  audit events carry the approver and the policy version (`P1`). The result digest
+  recomputes only with a field the receipt does not show (`P2`).
+- The MCP caller is whoever started the process. Tokens, cookies and forwarded-user
+  headers are ignored (`I1`). A REST caller can file a request under any actor name,
+  including the agent's, and the agent can then run it once approved (`I2`).
+  `P5b`: the REST execution read is open.
+- Claims of MFA, SSO or a trusted session on a decision are ignored and not
+  recorded (`I5`), and in the request context they change nothing (`I11`).
+- Secret-shaped text in a justification or in arguments is stored as typed and shown
+  by the open pending list; it was not found in the audit events (`I7a` to `I7g`).
+- A metadata-only tool is metadata-only by promise: an argument asking for the value
+  goes to a person like any other call (`I8c`).
+- One approver is enough at every tier, including critical (`I9`).
+- Actor types are `ai-agent`, `service-account` and `human-user`; others are denied
+  (`I4`). A service account asking for a role on itself is an ordinary identity
+  change (`I10`).
+- With the current weights, 15 of the 21 domain-tool rows landed at critical (one
+  role, ten minutes). A tool defined without its flags lands at medium and a
+  resource-owner can approve it (`S19` to `S21`): the tool catalogue is the control.
+
 ## Reviewer identity
 
 Reviewer names are typed in, not proven. `REVIEWER_ALLOWLIST` limits which typed

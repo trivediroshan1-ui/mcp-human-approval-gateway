@@ -1,5 +1,18 @@
 # Changelog
 
+## Round three (17 October 2026, evening)
+
+No change to the gateway. One new script, `scripts/run-coverage-cases.mjs`, with 46
+checks written to look at the parts of the identity world the first two rounds left
+out: what the permit and the receipt carry (P1 to P5b), what the gateway does with
+tokens, claims, actor types, secrets and MFA words (I1 to I11), and 20 made-up tools
+for government, schools and colleges, ERP, IT and IAM, robots and plant systems (S1
+to S21). The domain tools are test-only: the script runs the server from a temporary
+copy in which `scenarios.js` is wrapped to add them, and nothing in the repository
+changes. Predictions are in `scripts/round3/domain-pack.json`, written by
+`scripts/round3/predict.py` before the first run. Result: 45 as expected, 1 recorded
+(P1). The results table is in `docs/ROUND_THREE_RESULTS.md`.
+
 ## Round two (17 October 2026)
 
 - **A tool definition change now cancels earlier approvals.** The tool's own
