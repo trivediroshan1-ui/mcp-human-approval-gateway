@@ -96,6 +96,14 @@ function shortId(value) {
   return value ? value.slice(0, 8) : "—";
 }
 
+// Text written by an agent is shown as typed, except for characters that change how a line
+// reads without being visible (direction overrides, zero-width marks). Those are shown as
+// [U+XXXX] so a reviewer reads the same words that were stored and hashed.
+const HIDDEN_CHARS = /[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
+function showSafe(value) {
+  return String(value ?? "").replace(HIDDEN_CHARS, (ch) => "[U+" + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, "0") + "]");
+}
+
 function DemoBanner() {
   if (!IS_DEMO) return null;
   return (
@@ -331,6 +339,9 @@ function RequestQueue({ requests, selectedId, onSelect }) {
                 <small>
                   {request.actorId} · {request.action}
                 </small>
+                <small className="request-note">
+                  {shortId(request.id)} &middot; {showSafe(request.justification)}
+                </small>
               </span>
               <span className={`status-badge status-${request.status}`}>
                 {STATUS_COPY[request.status] ?? request.status}
@@ -396,7 +407,7 @@ function DecisionPanel({
         <div>
           <p className="section-label">Request {shortId(request.id)}</p>
           <h2 id="decision-title">{request.toolId}</h2>
-          <p>{request.justification}</p>
+          <p className="request-justification">{showSafe(request.justification)}</p>
         </div>
         <div className={`risk-gauge ${riskTone(request.riskLevel)}`}>
           <strong>{request.riskScore}</strong>

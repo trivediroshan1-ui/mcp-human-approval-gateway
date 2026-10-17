@@ -90,6 +90,11 @@ results file at the end (about ten seconds, Node 22 or newer):
 
 ```bash
 node scripts/run-use-cases.mjs              # add --real-wait for the real 11-minute expiry
+node scripts/run-gap-cases.mjs                # G1 to G32 (add --full for the one-minute wait)
+node scripts/run-change-cases.mjs             # policy and tool definition changes
+node scripts/run-second-client.mjs            # a client with the older handshake
+node scripts/run-binding-profiles.mjs         # prototype of fields that may vary, and attempts to abuse it
+node scripts/run-conformance.mjs --label mine # 15 approval-binding checks
 ```
 
 It covers changed requests after approval, text and encoding variants, time,

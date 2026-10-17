@@ -2319,3 +2319,20 @@ button:disabled {
   color: var(--text);
   font-weight: 600;
 }
+
+/* Long agent text must wrap, and queue rows must tell requests apart. */
+.request-justification {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.request-main {
+  min-width: 0;
+}
+
+.request-note {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

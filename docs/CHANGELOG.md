@@ -1,5 +1,33 @@
 # Changelog
 
+## Round two (17 October 2026)
+
+- **A tool definition change now cancels earlier approvals.** The tool's own
+  registry entry (base risk, allowed actions, scopes, flags) is part of the binding
+  payload, as stable text, so an approval given for one definition no longer runs
+  after the definition is loosened. Found by `scripts/run-change-cases.mjs` (U16a):
+  on the previous code the old approval still executed. `POLICY_VERSION` moves to
+  `2026-10.2`, which also ends every approval created before this change. Test:
+  `tests/tool-definition-binding.test.js`. The browser copy of the policy is kept
+  identical.
+- **Review screen: hidden characters are shown.** Direction overrides and
+  zero-width marks in agent text are drawn as `[U+202E]` and similar, so a reviewer
+  reads the same words that were stored and hashed. Before, a hidden override made
+  the stored word "evil" show as "live".
+- **Review screen: long text wraps.** One unbroken run of characters used to run
+  off the panel with no scrollbar. It now wraps.
+- **Review screen: queue rows tell requests apart.** Each row shows a short id and
+  the start of the justification.
+- New scripts, all synthetic and each starting its own copies of the gateway:
+  `run-gap-cases.mjs` (G1 to G32), `run-x2-baseline.mjs`, `run-change-cases.mjs`
+  (policy and tool definition changes), `run-second-client.mjs` (a client using the
+  older handshake), `run-binding-profiles.mjs` (a throwaway prototype of per-tool
+  fields that may vary, and 17 attempts to smuggle text through them),
+  `run-conformance.mjs` with `conformance/adapter-humangate.mjs` (15 approval
+  binding checks behind a five-function adapter), and `seed-lab-cases.mjs` (puts
+  the screen-check cases into a running lab).
+- Tests: 213.
+
 ## Open findings closed
 
 - `check_approval_status` now settles time before answering: a reservation past

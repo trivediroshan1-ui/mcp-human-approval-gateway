@@ -157,7 +157,8 @@ production security product.
 
 ## Binding rules (what counts as "the same request")
 
-The request hash covers: policy version, actor, tool, action, resource,
+The request hash covers: policy version, the tool's own definition (as stable
+text of its registry entry, since policy version 2026-10.2), actor, tool, action, resource,
 environment, data classification, requested scopes, arguments, justification and
 context. Before hashing: top-level text is trimmed; `environment` and
 `dataClassification` are lowercased; `requestedScopes` are de-duplicated and
@@ -165,6 +166,20 @@ sorted; `arguments` are compared exactly (case, spacing and key values count; ke
 order does not); `existingScopes` are self-reported and not part of the hash.
 A trailing space on `justification` therefore does not change the hash, while a
 changed value inside `arguments` does. Pinned by `tests/open-findings.test.js`.
+
+### Known limits of the binding (round two, 17 October 2026)
+
+- An approval id is tied to the agent id, which is set per gateway process, not
+  per MCP client. Another client talking to the same process can present the id.
+  It still works only once. Measured by `scripts/run-second-client.mjs` (U14d).
+- A saved copy of the last audit sequence and hash is the only way to see that the
+  end of the log was cut off (`G27`). Changing `AUDIT_HMAC_KEY` makes older events
+  fail verification (`G26`). Restoring an older database copy brings back an
+  approval that was already used (`G18`); a downstream that cannot see the gateway
+  needs its own idempotency key.
+- Review screen: hidden direction marks are shown as `[U+XXXX]`; text is wrapped;
+  the queue shows an id and the start of the justification. A person still reads
+  one request at a time.
 
 ## Reviewer identity
 

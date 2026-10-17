@@ -70,6 +70,26 @@ Build and test together:
 npm run check
 ```
 
+## Round two evidence (17 October 2026)
+
+About 90 more scripted cases, each with the prediction written before the run. One
+run each, on a Mac (Node 22) and on Linux, synthetic data and temporary databases.
+
+| Script | Cases | Result |
+|---|---|---|
+| `run-gap-cases.mjs` | G1 to G32 (27 run by script) | all as expected or recorded; G9, G29 and G31 are by hand |
+| `run-x2-baseline.mjs` | 10 payloads in a field outside the hash | 7 executed untouched, 3 stopped |
+| `run-change-cases.mjs` | U15a to U16b | policy change: approval refused; tool definition change: refused after the fix, executed before it |
+| `run-second-client.mjs` | U14a to U14f | one prediction wrong: another client could present the id (U14d) |
+| `run-binding-profiles.mjs` | X1 (8) and X2 (17) | prototype only; none of 17 smuggling attempts executed |
+| `run-conformance.mjs` | B01 to B14 plus B02b (15) | 15 of 15; a deliberately weakened copy fails B06 |
+
+Also done by hand on 17 October: the real Claude Code as the agent, with a person
+approving (asked, waited, ran once, a retry with the same key returned the stored
+result, a new key was refused); the browser lab (hidden characters, long text,
+queue of 44); an independent recomputation of the exported audit log hashes.
+Nothing here is a claim of security; it is what this gateway did on these cases.
+
 ## Human evaluation
 
 The console should make the following distinguishable without hidden state:

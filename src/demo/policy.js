@@ -6,7 +6,7 @@ import { TOOL_REGISTRY } from "./scenarios.js";
 // Bump this whenever scoring, thresholds or checks change. It is part of the
 // request hash, so an approval given under one policy version is not valid
 // evidence for a request evaluated under another.
-export const POLICY_VERSION = "2026-10.1";
+export const POLICY_VERSION = "2026-10.2";
 
 // A request that sits in the review queue longer than this can no longer be
 // approved. The reviewer has to look at a fresh request.
@@ -312,9 +312,26 @@ export function detectInjection(input) {
 // The exact fields an approval is bound to. Its hash goes into the request
 // record, the human decision and the audit trail, and the execution guard
 // recomputes it before it consumes the authorization.
+// Stable text for any JSON-like value: object keys sorted, so the same definition
+// always gives the same hash.
+function stableText(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(stableText).join(",") + "]";
+  return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + stableText(value[k])).join(",") + "}";
+}
+
+// The tool's own definition (risk, allowed scopes, flags) as stable text. It goes into
+// the binding payload, which is hashed with the rest of the request, so an approval
+// given for one definition is not valid after the definition is loosened or changed.
+export function toolDefinitionText(toolId) {
+  if (!Object.hasOwn(TOOL_REGISTRY, toolId)) return null;
+  return stableText(TOOL_REGISTRY[toolId]);
+}
+
 export function bindingPayload(input) {
   return {
     policyVersion: POLICY_VERSION,
+    toolDefinition: toolDefinitionText(input.toolId),
     actorId: input.actorId,
     actorType: input.actorType,
     toolId: input.toolId,
