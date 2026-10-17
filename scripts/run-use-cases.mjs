@@ -449,5 +449,5 @@ const result = {
 mkdirSync(join(root, "results"), { recursive: true });
 const file = join(root, "results", `usecases-${done.toISOString().slice(0, 10)}.json`);
 writeFileSync(file, JSON.stringify(result, null, 2));
-console.log(`\n${cases.length} cases. ${JSON.stringify(tally)}\nResults file: ${file}\nSend me this file (or paste it) and I will put it on your site.`);
+console.log(`\n${cases.length} cases. ${JSON.stringify(tally)}\nResults file: ${file}`);
 process.exit(0);

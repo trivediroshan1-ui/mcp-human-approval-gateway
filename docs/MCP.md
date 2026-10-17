@@ -104,9 +104,13 @@ or in a project `.mcp.json`:
 }
 ```
 
-I did not run Claude Code against this server. Which protocol revision it picks
-depends on its runtime, so treat it as untested. The MCP Inspector is the one
-client I ran by hand (see "Tested with MCP Inspector").
+On 17 October 2026 I ran Claude Code 2.1.302 against this server by hand, on the
+same MacBook Air, using the HTTP command above. It listed the tools, got
+`pending_approval` for a production deploy, ran it once after a person approved
+it, got the stored result back for the same idempotency key, and was refused for a
+new key. Which protocol revision it picks depends on its runtime, so I do not state
+one. The other client I ran by hand is the MCP Inspector (see "Tested with MCP
+Inspector").
 
 ### curl
 
@@ -286,10 +290,10 @@ Not implemented:
 - Pagination. `tools/list` is one page and refuses a cursor.
 - Persistent rate limiting. The limiter is in memory and per process.
 
-Tested with one third-party client: the official MCP Inspector v2.9.0, run by hand
-on 3 October 2026 over HTTP, negotiating MCP 2025-11-25 (not 2026-07-28). See
-"Tested with MCP Inspector" below. No other client or SDK has been run against the
-server. The automated tests drive it with raw JSON-RPC written from the
+Tested by hand with two third-party clients: the official MCP Inspector v2.9.0 on
+3 October 2026 over HTTP, negotiating MCP 2025-11-25 (not 2026-07-28), see
+"Tested with MCP Inspector" below, and Claude Code 2.1.302 on 17 October 2026 over
+HTTP. No other client or SDK has been run against the server. The automated tests drive it with raw JSON-RPC written from the
 specification, so they show the server matches my reading of it, not that every
 client agrees.
 
