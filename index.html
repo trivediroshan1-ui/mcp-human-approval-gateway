@@ -36,7 +36,15 @@
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to decision desk</a>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Shown to crawlers, link previews and anyone without JavaScript. React replaces it on load. -->
+      <main id="main-content" style="max-width:760px;margin:48px auto;padding:0 20px;font-family:system-ui,-apple-system,sans-serif;color:#e6edf7;line-height:1.6">
+        <p><a href="https://roshantrivedi.co.in/labs/" style="color:#58e6f6">&larr; Back to Labs</a></p>
+        <h1>MCP Human Approval Gateway</h1>
+        <p>A research prototype that checks AI agent tool calls against a fixed policy, asks a person to approve risky ones, and keeps a hash-chained audit record. It includes a real MCP server and this browser demo.</p>
+        <p>The interactive lab needs JavaScript. The code and documentation are on <a href="https://github.com/trivediroshan1-ui/mcp-human-approval-gateway" style="color:#58e6f6">GitHub</a>.</p>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
