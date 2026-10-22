@@ -121,13 +121,15 @@ function DemoBanner() {
 }
 
 const SITE_URL = "https://roshantrivedi.co.in/";
+const LABS_URL = "https://roshantrivedi.co.in/labs/";
 const CASE_STUDY_URL = "https://roshantrivedi.co.in/case-studies/agentic-ai-identity-governance/";
 const MCP_DOCS_URL = "https://github.com/trivediroshan1-ui/mcp-human-approval-gateway/blob/main/docs/MCP.md";
 
 function SiteBar() {
   return (
     <nav className="site-bar" aria-label="Site links">
-      <a href={SITE_URL}>&larr; roshantrivedi.co.in</a>
+      <a href={LABS_URL}>&larr; Back to Labs</a>
+          <a href={SITE_URL}>roshantrivedi.co.in</a>
       <a href={CASE_STUDY_URL}>How this fits agent identity governance</a>
     </nav>
   );
