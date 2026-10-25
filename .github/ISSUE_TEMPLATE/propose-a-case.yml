@@ -1,0 +1,36 @@
+name: Propose a test case
+description: A tool call the gateway should handle differently.
+title: "Case proposal: "
+labels: ["case-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: "Synthetic tools and made-up data only. Write the expected outcome BEFORE you run it."
+  - type: textarea
+    id: call
+    attributes:
+      label: The tool call
+      description: "Agent, tool, action, resource, environment, scopes."
+    validations:
+      required: true
+  - type: dropdown
+    id: expected
+    attributes:
+      label: What should happen
+      options:
+        - Run
+        - Hold for a person
+        - Refuse
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why you think the gateway may get it wrong
+  - type: checkboxes
+    id: ok
+    attributes:
+      label: Checks
+      options:
+        - label: "No real credentials, endpoints or employer information"
+          required: true
