@@ -75,7 +75,7 @@ try {
 } finally { await a.stop(); }
 
 const fails = rows.filter((r) => r.result === "FAIL").length;
-const esc = (s) => String(s ?? "").replace(/\|/g, "\\|");
+const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 let md = `# Approval-binding conformance: ${label} (${new Date().toISOString()})\n\nAdapter: ${a.name}. Synthetic data, one run. Checks approval binding only. A script run, not hand-run evidence.\n\n**${rows.length - fails} of ${rows.length} pass.**\n\n| ID | Check | Result | What came back |\n|---|---|---|---|\n`;
 for (const r of rows) md += `| ${r.id} | ${esc(r.title)} | ${r.result} | ${esc(r.seen)} |\n`;
 writeFileSync(`conformance-${label}.md`, md); writeFileSync(`conformance-${label}.json`, JSON.stringify(rows, null, 2));

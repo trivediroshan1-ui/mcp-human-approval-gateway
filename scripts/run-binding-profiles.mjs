@@ -201,7 +201,7 @@ try {
   for (const c of children) if (c.exitCode === null) c.kill("SIGKILL");
 }
 
-const esc = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 const smug = rows.filter((r) => r.group === "X2");
 const gotThrough = smug.filter((r) => String(r.profile).startsWith("executed")).map((r) => r.id);
 let md = `# X1 and X2: binding profile prototype (${new Date().toISOString()})\n\nSynthetic data, copies of the repo edited in a temporary folder, one run each. The prototype lives only in the copies. A script run, not hand-run evidence.\n\n`;

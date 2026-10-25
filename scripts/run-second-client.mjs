@@ -82,7 +82,7 @@ try {
   record("U14f", "Audit chain after both clients", "valid and signed", `valid=${ver.valid} signed=${ver.signed} events=${ver.checkedEvents}; actors: ${actors.join(", ")}`, ver.valid === true && ver.signed === true);
 } finally {
   child.kill("SIGINT"); await sleep(300); child.kill("SIGKILL");
-  const esc = (s) => String(s ?? "").replace(/\|/g, "\\|");
+  const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
   let md = `# U14: second MCP client (${new Date().toISOString()})\n\nClient two uses the 2025-11-25 handshake and its own client name. Same gateway and database. Synthetic data, one run. It is a hand-written client, not Claude Code.\n\n| ID | Case | Predicted | What came back | Verdict |\n|---|---|---|---|---|\n`;
   for (const r of rows) md += `| ${r.id} | ${esc(r.title)} | ${esc(r.expected)} | ${esc(r.observed)} | ${r.verdict} |\n`;
   writeFileSync("second-client-results.md", md); writeFileSync("second-client-results.json", JSON.stringify(rows, null, 2));
