@@ -110,7 +110,7 @@ async function main() {
 
 try { await main(); } finally { for (const c of children) if (c.exitCode === null) c.kill("SIGKILL"); }
 
-const esc = (s) => String(s ?? "").replace(/\|/g, "\\|");
+const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 let md = `# Change cases U15 and U16 (${new Date().toISOString()})\n\nSynthetic data, temporary databases, copies of the repo edited in a temporary folder. One run each. A script run, not hand-run evidence.\n\n| ID | Case | Predicted | What came back | Verdict | Note |\n|---|---|---|---|---|---|\n`;
 for (const r of rows) md += `| ${r.id} | ${esc(r.title)} | ${esc(r.expected)} | ${esc(r.observed)} | ${r.verdict} | ${esc(r.note)} |\n`;
 writeFileSync("change-results.md", md); writeFileSync("change-results.json", JSON.stringify(rows, null, 2));

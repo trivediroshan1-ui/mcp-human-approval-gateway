@@ -295,7 +295,7 @@ async function main() {
 try { await main(); } finally { for (const ch of children) if (ch.exitCode === null) ch.kill("SIGKILL"); }
 
 // ---------- write results ----------
-const esc = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 const counted = rows.filter((r) => r.group !== "S0");
 const tally = counted.reduce((m, r) => ((m[r.verdict] = (m[r.verdict] ?? 0) + 1), m), {});
 let md = `# Coverage cases run (${new Date().toISOString()})\n\nMachine: ${platform()} ${release()} ${arch()}, Node ${process.version}. One run each, synthetic data, temporary databases. This is a script run, not hand-run evidence. P and I ran on the repository gateway unchanged. S ran on a temporary copy with 20 test-only tools added to the registry.\n\n${counted.length} checks: ${Object.entries(tally).map(([k, v]) => `${v} ${k}`).join(", ")}.\n\n| ID | Case | Predicted | What came back | Verdict | Note |\n|---|---|---|---|---|---|\n`;

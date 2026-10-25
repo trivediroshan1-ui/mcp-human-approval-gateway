@@ -336,7 +336,7 @@ try { await main(); } finally { for (const ch of children) if (ch.exitCode === n
 // ---------- write results ----------
 const order = (id) => Number((id.match(/\d+/) ?? [999])[0]);
 rows.sort((a, b) => order(a.id) - order(b.id));
-const esc = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 let md = `# Gap cases run (${new Date().toISOString()})\n\nMachine: ${platform()} ${release()} ${arch()}, Node ${process.version}. One run each, synthetic data, temporary databases. This is a script run, not hand-run evidence.\n\n| ID | Case | Predicted | What came back | Verdict | Note |\n|---|---|---|---|---|---|\n`;
 for (const r of rows) md += `| ${r.id} | ${esc(r.title)} | ${esc(r.expected)} | ${esc(r.observed)} | ${r.verdict} | ${esc(r.note)} |\n`;
 writeFileSync("gap-results.md", md); writeFileSync("gap-results.json", JSON.stringify(rows, null, 2));

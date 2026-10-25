@@ -64,7 +64,7 @@ for (const [label, value] of payloads) {
   console.log(label.padEnd(36), "->", rows.at(-1).execute);
 }
 
-const esc = (s) => String(s ?? "").replace(/\|/g, "\\|");
+const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 let md = `# X2 baseline: payloads in a field outside the hash (${new Date().toISOString()})\n\nThe gateway has no binding profile yet. The only field outside the hash is existingScopes. Each row approves a request, then executes it with the payload below in existingScopes.\n\n| Payload | First call | Execute with payload | Stored value (start) | Audit log |\n|---|---|---|---|---|\n`;
 for (const r of rows) md += `| ${esc(r.label)} | ${esc(r.create)} | ${esc(r.execute)} | ${esc(r.stored)} | ${esc(r.audit)} |\n`;
 md += `\nRead it like this: "executed" means the payload went through the approval untouched. That is the gap a binding profile with type, length and format limits has to close. Synthetic data, one run, script run and not hand-run evidence.\n`;
