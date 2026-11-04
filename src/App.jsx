@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // by the in-browser demo service — no server, no credentials, no real data.
 import { demoApiAdapter } from "./demo/client.js";
 import Architecture from "./Architecture.jsx";
+import { metricsOf, outcomeOf } from "./request-outcome.js";
 const IS_DEMO = import.meta.env.VITE_STATIC_DEMO === "true";
 
 const REVIEWERS = [
@@ -21,18 +22,6 @@ function newKey() {
   return `ui-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
-const STATUS_COPY = {
-  auto_approved: "Auto-approved",
-  pending_human: "Human review",
-  approved: "Approved",
-  denied: "Denied",
-  executing: "Executing",
-  executed: "Executed",
-  failed: "Failed",
-  unknown_outcome: "Unknown outcome",
-  expired: "Expired",
-  gate_rejected: "Gate rejected",
-};
 
 async function api(path, options) {
   // In demo mode, bypass the network entirely and use the browser service.
@@ -258,8 +247,12 @@ function Hero({ metrics }) {
           <span>Awaiting humans</span>
         </div>
         <div>
-          <strong>{metrics.blocked}</strong>
+          <strong>{metrics.policyBlocked}</strong>
           <span>Policy blocked</span>
+        </div>
+        <div>
+          <strong>{metrics.humanDenied}</strong>
+          <span>Human denied</span>
         </div>
         <div>
           <strong>{metrics.executed}</strong>
@@ -345,8 +338,8 @@ function RequestQueue({ requests, selectedId, onSelect }) {
                   {shortId(request.id)} &middot; {showSafe(request.justification)}
                 </small>
               </span>
-              <span className={`status-badge status-${request.status}`}>
-                {STATUS_COPY[request.status] ?? request.status}
+              <span className={`status-badge status-${outcomeOf(request).key}`}>
+                {outcomeOf(request).label}
               </span>
               <span className={`score score-${riskTone(request.riskLevel)}`}>
                 {request.riskScore}
@@ -463,8 +456,8 @@ function DecisionPanel({
         <div className="evidence-card">
           <div className="card-label">
             Deterministic policy
-            <span className={`status-badge status-${request.status}`}>
-              {STATUS_COPY[request.status] ?? request.status}
+            <span className={`status-badge status-${outcomeOf(request).key}`}>
+              {outcomeOf(request).label}
             </span>
           </div>
           <ul>
@@ -877,6 +870,42 @@ const TOUR_STEPS = [
   },
 ];
 
+const HOW_TO_STEPS = [
+  ["Pick a scenario", "Each card in the catalogue is a request an AI agent might send. Simulate one, or follow the guided walkthrough below."],
+  ["Read what policy decided", "Low-risk requests are auto-approved. Risky ones wait for a person. Unregistered tools and injected instructions are policy blocked before anyone sees them."],
+  ["Decide as a reviewer", "Choose a reviewer with the required role, give a reason, then approve or deny. A wrong role or the requesting agent itself is refused."],
+  ["Execute and check the record", "An approval works once and expires. Try running it twice, or moving the lab clock forward, then verify the audit chain."],
+];
+
+function HowToUse() {
+  return (
+    <details className="panel tour-panel how-panel" open>
+      <summary>
+        <span>
+          <strong>How to use this lab</strong>
+          <small>Four steps. Everything here is simulated: no live agent, MCP server, repository or credential is touched.</small>
+        </span>
+      </summary>
+      <ol className="tour-steps">
+        {HOW_TO_STEPS.map(([title, text], index) => (
+          <li key={title} className="tour-step current how-step">
+            <span className="tour-index" aria-hidden="true">{index + 1}</span>
+            <div>
+              <strong>{title}</strong>
+              <p>{text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="tour-done">
+        <a href="#architecture">See the architecture</a> ·{" "}
+        <a href="https://github.com/trivediroshan1-ui/mcp-human-approval-gateway" rel="noopener noreferrer">Code on GitHub</a> ·{" "}
+        <a href={SITE_URL} rel="noopener noreferrer">Roshan Trivedi</a>
+      </p>
+    </details>
+  );
+}
+
 function Walkthrough({ step, busy, onRun, onRestart }) {
   const [open, setOpen] = useState(false);
   const finished = step >= TOUR_STEPS.length;
@@ -942,15 +971,7 @@ function App() {
 
   const selected = requests.find((request) => request.id === selectedId) ?? null;
 
-  const metrics = useMemo(
-    () => ({
-      total: requests.length,
-      pending: requests.filter((request) => request.status === "pending_human").length,
-      blocked: requests.filter((request) => request.status === "denied").length,
-      executed: requests.filter((request) => request.status === "executed").length,
-    }),
-    [requests],
-  );
+  const metrics = useMemo(() => metricsOf(requests), [requests]);
 
   const refresh = useCallback(async (preferredId = null) => {
     const [requestPayload, auditPayload, verifyPayload] = await Promise.all([
@@ -1050,9 +1071,14 @@ function App() {
             reason,
           }),
         }),
-      decision === "approve"
-        ? "Time-bound authorization granted by a human reviewer."
-        : "Request denied and recorded.",
+      (result) => {
+        const name = `${selected?.toolId ?? "Request"} \u00b7 ${selected?.action ?? ""}`.trim();
+        const who = reviewer.role.replace(/-/g, " ");
+        if (decision !== "approve") return `${name}: denied by a ${who}. The decision is in the audit chain.`;
+        const until = result?.request?.authorizationExpiresAt;
+        const time = until ? new Date(until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
+        return `${name}: approved by a ${who}.${time ? ` The authorization can be used once, until ${time}.` : ""}`;
+      },
     );
   }
 
@@ -1313,6 +1339,7 @@ function App() {
             {notice.message}
           </div>
         )}
+        <HowToUse />
         <Walkthrough
           step={tourStep}
           busy={busy || scenarios.length === 0}
