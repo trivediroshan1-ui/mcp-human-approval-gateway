@@ -351,7 +351,7 @@ main {
 .metric-strip {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   margin-top: 2rem;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -1964,12 +1964,16 @@ button:disabled {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .metric-strip > div:nth-child(2) {
+  .metric-strip > div:nth-child(even) {
     border-right: 0;
   }
 
-  .metric-strip > div:nth-child(-n + 2) {
+  .metric-strip > div:nth-child(-n + 4) {
     border-bottom: 1px solid var(--line);
+  }
+
+  .metric-strip > div:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .workspace {
@@ -2336,3 +2340,11 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Outcome badges: the three kinds of "denied" read differently. */
+.status-policy_blocked,
+.status-integrity_denied { color: var(--red); border-color: rgba(255, 111, 125, 0.32); }
+.status-human_denied { color: var(--amber); border-color: rgba(255, 180, 91, 0.45); border-style: dashed; }
+
+.how-panel .how-step { grid-template-columns: 28px 1fr; }
+.how-panel .tour-done a { color: var(--cyan); }
