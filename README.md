@@ -1,8 +1,27 @@
 # MCP Human Approval Gateway
 
-A public-safe research prototype for controlling AI-agent tool actions with
-deterministic policy, risk-based human approval, time-bound authorization and a
-tamper-evident audit chain.
+[![Verify gateway](https://github.com/trivediroshan1-ui/mcp-human-approval-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/trivediroshan1-ui/mcp-human-approval-gateway/actions/workflows/ci.yml) ![210 checks](https://img.shields.io/badge/checks-210-4de2ff?style=flat-square) ![Node 24](https://img.shields.io/badge/node-24%2B-34d399?style=flat-square) ![MCP](https://img.shields.io/badge/MCP-HTTP%20and%20stdio-8b5cf6?style=flat-square) ![MIT](https://img.shields.io/badge/licence-MIT-f7c873?style=flat-square) ![Synthetic data](https://img.shields.io/badge/data-synthetic-a9b6d3?style=flat-square)
+
+**When an AI agent wants to do something risky, who says yes, and can you prove it later?**
+This gateway sits between an agent and its tools. Low-risk calls go through. Risky ones wait for a named person, the approval is tied to that one exact request, it expires, it can be used once, and every decision lands in a hash-chained log.
+
+[Try the browser demo](https://trivediroshan1-ui.github.io/mcp-human-approval-gateway/) ·
+[Read the case study](https://roshantrivedi.co.in/mcp-lab-case-study/?utm_source=github&utm_medium=readme) ·
+[Free book, 138 pages](https://roshantrivedi.co.in/book/?utm_source=github&utm_medium=readme) ·
+[Run it locally](#run-locally)
+
+```mermaid
+flowchart LR
+  A[AI agent<br>tool call] --> B{Registered<br>tool?}
+  B -- no --> X[Refused<br>fails closed]
+  B -- yes --> C[Policy decides<br>risk and scope]
+  C -- low risk --> E[Runs with a<br>time-bound permit]
+  C -- high risk --> D[A person approves<br>this exact request]
+  D -- denied --> X
+  D -- approved --> E
+  E --> F[(Hash-chained<br>audit log)]
+  X --> F
+```
 
 It speaks the Model Context Protocol (revision 2026-07-28, with 2025-11-25 for
 older clients) over Streamable HTTP and stdio, so a real MCP client can call its
