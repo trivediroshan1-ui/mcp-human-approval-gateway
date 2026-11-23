@@ -2,6 +2,11 @@
 
 [![Verify gateway](https://github.com/trivediroshan1-ui/mcp-human-approval-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/trivediroshan1-ui/mcp-human-approval-gateway/actions/workflows/ci.yml) ![210 checks](https://img.shields.io/badge/checks-210-4de2ff?style=flat-square) ![Node 24](https://img.shields.io/badge/node-24%2B-34d399?style=flat-square) ![MCP](https://img.shields.io/badge/MCP-HTTP%20and%20stdio-8b5cf6?style=flat-square) ![MIT](https://img.shields.io/badge/licence-MIT-f7c873?style=flat-square) ![Synthetic data](https://img.shields.io/badge/data-synthetic-a9b6d3?style=flat-square)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-dark.svg">
+  <img alt="MCP Human Approval Gateway. A tool call from an AI agent passes the policy check, waits for a named person to approve that exact request, gets a permit that can be used once and expires, and every decision goes into a hash-chained audit log." src="docs/img/banner-light.svg" width="100%">
+</picture>
+
 **When an AI agent wants to do something risky, who says yes, and can you prove it later?**
 This gateway sits between an agent and its tools. Low-risk calls go through. Risky ones wait for a named person, the approval is tied to that one exact request, it expires, it can be used once, and every decision lands in a hash-chained log.
 
