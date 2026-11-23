@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-labelledby="t d">
+<title id="t">MCP Human Approval Gateway</title>
+<desc id="d">A tool call from an AI agent passes the policy check, waits for a named person to approve that exact request, gets a permit that can be used once and expires, and every decision is written to a hash-chained log. 210 scripted checks.</desc>
+<style>.pkt{offset-path:path("M120 228 H1080");animation:pkt 6.0s linear .5s 3 both}@keyframes pkt{0%{offset-distance:0%;opacity:0}4%{opacity:1}50%{offset-distance:52.1%}66%{offset-distance:52.1%}96%{offset-distance:100%;opacity:1}100%{offset-distance:100%;opacity:0}}.gate{transform-box:fill-box;transform-origin:center;animation:gate 6.0s ease-out .5s 3 both}@keyframes gate{0%,48%{transform:scale(1);opacity:.16}56%{transform:scale(1.6);opacity:.4}66%,100%{transform:scale(1);opacity:.16}}.ok{animation:ok 6.0s ease-out .5s 3 both}@keyframes ok{0%,60%{opacity:0}66%,100%{opacity:1}}@media (prefers-reduced-motion: reduce){.pkt{display:none}.gate,.ok{animation:none}.ok{opacity:1}}</style>
+<rect width="1200" height="320" rx="18" fill="#f7f9ff"/>
+<rect x=".5" y=".5" width="1199" height="319" rx="18" fill="none" stroke="#d5dcec"/>
+<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<text x="56" y="64" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" letter-spacing="3" fill="#0a7f93">MODEL CONTEXT PROTOCOL · HTTP AND STDIO · 210 CHECKS</text>
+<text x="56" y="118" font-size="46" font-weight="800" fill="#0b1230">MCP Human Approval Gateway</text>
+<text x="56" y="154" font-size="20" fill="#4a5675">When an AI agent wants to do something risky, a named person says yes, and you can prove it later.</text>
+<line x1="120" y1="228" x2="1080" y2="228" stroke="#d5dcec" stroke-width="3" stroke-linecap="round"/>
+<circle cx="120" cy="228" r="11" fill="#f7f9ff" stroke="#0a7f93" stroke-width="3"/>
+<text x="120" y="272" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1230">AI agent</text>
+<text x="120" y="294" text-anchor="middle" font-size="14" fill="#4a5675">tool call</text>
+<circle cx="370" cy="228" r="11" fill="#f7f9ff" stroke="#0a7f93" stroke-width="3"/>
+<text x="370" y="272" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1230">Policy</text>
+<text x="370" y="294" text-anchor="middle" font-size="14" fill="#4a5675">risk and scope</text>
+<circle class="gate" cx="620" cy="228" r="22" fill="#9a6100" fill-opacity="1" opacity=".16"/>
+<circle cx="620" cy="228" r="11" fill="#f7f9ff" stroke="#9a6100" stroke-width="3"/>
+<text x="620" y="272" text-anchor="middle" font-size="18" font-weight="700" fill="#9a6100">A person</text>
+<text x="620" y="294" text-anchor="middle" font-size="14" fill="#4a5675">approves this request</text>
+<circle cx="870" cy="228" r="11" fill="#f7f9ff" stroke="#047857" stroke-width="3"/>
+<text x="870" y="272" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1230">Permit</text>
+<text x="870" y="294" text-anchor="middle" font-size="14" fill="#4a5675">once, then expires</text>
+<circle cx="1080" cy="228" r="11" fill="#f7f9ff" stroke="#6d3fe0" stroke-width="3"/>
+<text x="1080" y="272" text-anchor="middle" font-size="18" font-weight="700" fill="#0b1230">Audit log</text>
+<text x="1080" y="294" text-anchor="middle" font-size="14" fill="#4a5675">hash-chained</text>
+<g class="ok"><rect x="574" y="170" width="92" height="28" rx="14" fill="#ffffff" stroke="#047857"/><text x="620" y="189" text-anchor="middle" font-size="14" font-weight="700" fill="#047857">approved</text></g>
+<circle class="pkt" cx="0" cy="0" r="6.5" fill="#0a7f93"/>
+</g>
+</svg>
